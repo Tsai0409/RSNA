@@ -91,7 +91,7 @@ parser.add_argument("--config", '-c', type=str, default='Test',
                     help="config name in configs.py")
 parser.add_argument("--gpu", '-g', type=str, default='nochange',
                     help="config name in configs.py")
-parser.add_argument("--fold", type=int, default=0,
+parser.add_argument("--fold", '-f', type=int, default=0,
                     help="fold num")
 parser.add_argument("--use_row", type=int, default=2,
                     help="google spread sheet row")
@@ -103,8 +103,11 @@ print(args)
 fold = args.fold
 config = args.config
 cfg = eval(args.config)()
-cfg.train_df.path = cfg.absolute_path + '/' + cfg.train_df.path
-cfg.test_df.path = cfg.absolute_path + '/' + cfg.test_df.path
+# cfg.train_df.path = cfg.absolute_path + '/' + cfg.train_df.path
+# cfg.test_df.path = cfg.absolute_path + '/' + cfg.test_df.path
+print('absolute_path = '+cfg.absolute_path)
+cfg.train_df.path = cfg.train_df.path
+cfg.test_df.path = cfg.test_df.path
 
 cfg.train_df.class_id = cfg.train_df.class_id.astype(int)
 if 'x_min' not in list(cfg.train_df):
@@ -117,6 +120,8 @@ if 'y_max' not in list(cfg.train_df):
     cfg.train_df['y_max'] = cfg.train_df['image_height'] * (cfg.train_df['y_center_scaled']+cfg.train_df['height_scaled']/2)
 
 os.chdir('src/YOLOX')
+sys.path.append("/kaggle/working/duplicate/src/YOLOX")
+os.chdir('/kaggle/working/duplicate/src/YOLOX')
 
 print(f'\n----------------------- Config -----------------------')
 config_str = ''
@@ -171,6 +176,15 @@ config_file_template = f'''
 # Copyright (c) Megvii, Inc. and its affiliates.
 
 import os
+import sys
+
+# 設定 PYTHONPATH 確保能夠找到 yolox 模組 我加
+sys.path.append("/kaggle/working/duplicate/src/YOLOX")
+os.chdir('/kaggle/working/duplicate/src/YOLOX')
+os.environ["PYTHONPATH"] = "/kaggle/working/duplicate/src/YOLOX:" + os.environ.get("PYTHONPATH", "")
+
+# 設定訓練命令 我加
+train_str = f'PYTHONPATH=/kaggle/working/duplicate/src/YOLOX python tools/train.py -f configfile_rsna_axial_all_images_left_yolox_x_fold0.py -d 1 -b 8 --fp16 -o -c /groups/gca50041/ariyasu/yolox_weights/yolox_x.pth'
 
 from yolox.exp import Exp as MyExp
 
@@ -252,7 +266,8 @@ if cfg.inference_only:
     print('inference_only.')
 else:
     print('train start...')
-    train_str = f'python train.py -f {config_path} -d 1 -b {cfg.batch_size} --fp16 -o -c {cfg.pretrained_path}'
+    # train_str = f'python train.py -f {config_path} -d 1 -b {cfg.batch_size} --fp16 -o -c {cfg.pretrained_path}'
+    train_str = f'python tools/train.py -f {config_path} -d 1 -b {cfg.batch_size} --fp16 -o -c {cfg.pretrained_path}'
 
 
     if cfg.resume:
