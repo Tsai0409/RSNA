@@ -289,6 +289,11 @@ class COCOEvaluator:
             else:
                 _, tmp = tempfile.mkstemp()
                 json.dump(data_dict, open(tmp, "w"))
+                # cocoDt = cocoGt.loadRes(tmp)
+                # --- monkey patch: prevent KeyError if 'info' is missing
+                if not hasattr(cocoGt, "dataset") or "info" not in cocoGt.dataset:
+                    cocoGt.dataset["info"] = {"description": "dummy"}
+
                 cocoDt = cocoGt.loadRes(tmp)
             try:
                 from yolox.layers import COCOeval_opt as COCOeval
