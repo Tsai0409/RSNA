@@ -150,7 +150,8 @@ class rsna_10classes_yolox_x(Baseline):
         self.update_json = False
         self.no_aug_epochs = 15
         self.warmup_epochs = 5
-        self.pretrained_path = '/groups/gca50041/ariyasu/yolox_weights/yolox_x.pth'
+        # self.pretrained_path = '/groups/gca50041/ariyasu/yolox_weights/yolox_x.pth'
+        self.pretrained_path = '/kaggle/input/pretrain-7/yolox_x.pth'
         self.image_size = (512, 512)
         self.batch_size = 8
         self.predict_valid = True
