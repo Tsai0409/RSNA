@@ -119,7 +119,7 @@ if 'y_min' not in list(cfg.train_df):
 if 'y_max' not in list(cfg.train_df):
     cfg.train_df['y_max'] = cfg.train_df['image_height'] * (cfg.train_df['y_center_scaled']+cfg.train_df['height_scaled']/2)
 
-# os.chdir('src/YOLOX')
+# os.chdir('src/YOLOX') 
 sys.path.append("/kaggle/working/duplicate/src/YOLOX")
 os.chdir('/kaggle/working/duplicate/src/YOLOX')
 
