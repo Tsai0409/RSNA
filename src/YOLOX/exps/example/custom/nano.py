@@ -23,8 +23,10 @@ class Exp(MyExp):
 
         # Define yourself dataset path
         self.data_dir = "datasets/coco128"
-        self.train_ann = "instances_train2017.json"
-        self.val_ann = "instances_val2017.json"
+        # self.train_ann = "instances_train2017.json"
+        self.train_ann = "train_rsna_axial_all_images_right_yolox_x___train_axial_for_yolo_all_image_v1_fold0_len9611.json"
+        # self.val_ann = "instances_val2017.json"
+        self.val_ann = "valid_rsna_axial_all_images_right_yolox_x___train_axial_for_yolo_all_image_v1_fold0_len1924.json"
 
         self.num_classes = 71
 
