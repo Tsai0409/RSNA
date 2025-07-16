@@ -122,7 +122,7 @@ class rsna_axial_all_images_right_yolox_x(Baseline):
         self.train_df['class_name'] = 'right'
         self.predict_test = True
         # self.epochs = 40
-        self.epochs = 3
+        self.epochs = 20
         val = self.train_df[self.train_df.fold==0]
         self.train_df['fold'] = -1
         self.train_df = pd.concat([self.train_df, val])
