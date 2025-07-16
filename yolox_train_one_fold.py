@@ -337,6 +337,11 @@ model.training=False
 ckpt_file = f"{cfg.absolute_path}/results/{config}/fold{fold}/{config}/best_ckpt.pth"
 ckpt = torch.load(ckpt_file, map_location="cpu")
 model.load_state_dict(ckpt["model"])
+
+# 🔽 儲存 test_df 為 CSV
+cfg.test_df.to_csv('test_df.csv', index=False)
+print(f"✅ test_df saved")
+
 for mode, df in zip(['oof', 'test'], [val, cfg.test_df]):
     if ((mode == 'oof') & (not cfg.predict_valid) or ((mode == 'test') & (not cfg.predict_test))):
         continue
