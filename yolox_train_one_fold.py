@@ -26,11 +26,66 @@ class NumpyEncoder(json.JSONEncoder):
 def save_annot_json(json_annotation, filename):
     json.dump(json_annotation, open(filename, 'w'), indent=4, cls=NumpyEncoder)
 
-annotion_id = 0
-image_id_n = 0
+# annotion_id = 0
+# image_id_n = 0
+# def dataset2coco(df):
+#     global annotion_id
+#     global image_id_n
+#     annotations_json = {
+#         "info": [],
+#         "licenses": [],
+#         "categories": categories,
+#         "images": [],
+#         "annotations": []
+#     }
+#     info = {
+#         "year": "2023",
+#         "version": "1",
+#         "description": f"{cfg.compe} dataset - COCO format",
+#         "contributor": "yujiariyasu",
+#         "url": "https://kaggle.com",
+#         "date_created": "2023-04-10T15:01:26+00:00"
+#     }
+#     annotations_json["info"].append(info)
+#     lic = {
+#             "id": 1,
+#             "url": "",
+#             "name": "Unknown"
+#         }
+#     annotations_json["licenses"].append(lic)
+#     for id_n, (path, idf) in enumerate(df.groupby('path')):
+#         images = {
+#             "id": image_id_n,
+#             "license": 1,
+#             "file_name": path,
+#             "height": idf.image_height.values[0],
+#             "width": idf.image_width.values[0],
+#             "date_captured": "2023-04-10T15:01:26+00:00"
+#         }
+
+#         annotations_json["images"].append(images)
+#         for _, row in idf.iterrows():
+#             bbox = row[['x_min', 'y_min', 'x_max', 'y_max']].values
+#             b_width = bbox[2]-bbox[0]
+#             b_height = bbox[3]-bbox[1]
+
+#             image_annotations = {
+#                 "id": annotion_id,
+#                 "image_id": image_id_n,
+#                 "category_id": row.class_id,
+#                 "bbox": [bbox[0], bbox[1], b_width, b_height],
+#                 "area": b_width * b_height,
+#                 "segmentation": [],
+#                 "iscrowd": 0
+#             }
+
+#             annotion_id += 1
+#             annotations_json["annotations"].append(image_annotations)
+#         image_id_n += 1
+#     print(f"len(df): {len(df)}")
+#     return annotations_json
+
 def dataset2coco(df):
-    global annotion_id
-    global image_id_n
     annotations_json = {
         "info": [],
         "licenses": [],
@@ -38,6 +93,7 @@ def dataset2coco(df):
         "images": [],
         "annotations": []
     }
+
     info = {
         "year": "2023",
         "version": "1",
@@ -47,43 +103,52 @@ def dataset2coco(df):
         "date_created": "2023-04-10T15:01:26+00:00"
     }
     annotations_json["info"].append(info)
+
     lic = {
-            "id": 1,
-            "url": "",
-            "name": "Unknown"
-        }
+        "id": 1,
+        "url": "",
+        "name": "Unknown"
+    }
     annotations_json["licenses"].append(lic)
-    for id_n, (path, idf) in enumerate(df.groupby('path')):
-        images = {
+
+    image_id_map = {}  # mapping from path to new image_id
+    annotation_id = 0
+    image_id_n = 0
+
+    for path, idf in df.groupby('path'):
+        image_info = {
             "id": image_id_n,
             "license": 1,
             "file_name": path,
-            "height": idf.image_height.values[0],
-            "width": idf.image_width.values[0],
+            "height": int(idf.image_height.values[0]),
+            "width": int(idf.image_width.values[0]),
             "date_captured": "2023-04-10T15:01:26+00:00"
         }
+        annotations_json["images"].append(image_info)
+        image_id_map[path] = image_id_n
 
-        annotations_json["images"].append(images)
         for _, row in idf.iterrows():
             bbox = row[['x_min', 'y_min', 'x_max', 'y_max']].values
-            b_width = bbox[2]-bbox[0]
-            b_height = bbox[3]-bbox[1]
+            b_width = float(bbox[2] - bbox[0])
+            b_height = float(bbox[3] - bbox[1])
 
-            image_annotations = {
-                "id": annotion_id,
+            ann = {
+                "id": annotation_id,
                 "image_id": image_id_n,
-                "category_id": row.class_id,
-                "bbox": [bbox[0], bbox[1], b_width, b_height],
+                "category_id": int(row.class_id),
+                "bbox": [float(bbox[0]), float(bbox[1]), b_width, b_height],
                 "area": b_width * b_height,
                 "segmentation": [],
                 "iscrowd": 0
             }
+            annotations_json["annotations"].append(ann)
+            annotation_id += 1
 
-            annotion_id += 1
-            annotations_json["annotations"].append(image_annotations)
         image_id_n += 1
-    print(f"len(df): {len(df)}")
+
+    print(f"✅ JSON created: {len(annotations_json['images'])} images, {len(annotations_json['annotations'])} annotations")
     return annotations_json
+
 
 import argparse
 parser = argparse.ArgumentParser()
