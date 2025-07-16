@@ -339,7 +339,7 @@ ckpt = torch.load(ckpt_file, map_location="cpu")
 model.load_state_dict(ckpt["model"])
 
 # 🔽 儲存 test_df 為 CSV
-cfg.test_df.to_csv('test_df.csv', index=False)
+cfg.test_df.to_csv(f'{cfg.absolute_path}/test_df.csv', index=False)
 print(f"✅ test_df saved")
 
 for mode, df in zip(['oof', 'test'], [val, cfg.test_df]):
