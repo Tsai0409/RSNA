@@ -118,8 +118,8 @@ class rsna_axial_all_images_right_yolox_x(Baseline):
         self.batch_size = 8
         self.predict_valid = True
         # self.train_df_path = 'input/train_axial_for_yolo_all_image_v1.csv'
-        self.train_df_path = f'{WORKING_DIR}/csv_train/region_estimation_by_yolox_6/train_axial_for_yolo_all_image_v1.csv'
-        # self.train_df_path = f'{WORKING_DIR}/csv_train/region_estimation_by_yolox_holdout_6/train_axial_for_yolo_all_image_v1.csv'
+        # self.train_df_path = f'{WORKING_DIR}/csv_train/region_estimation_by_yolox_6/train_axial_for_yolo_all_image_v1.csv'
+        self.train_df_path = f'{WORKING_DIR}/csv_train/region_estimation_by_yolox_holdout_6/train_axial_for_yolo_all_image_v1.csv'
         self.train_df = pd.read_csv(self.train_df_path)
         self.train_df = self.train_df[self.train_df.condition != 'Left Subarticular Stenosis']
         self.train_df['class_id'] = 0
