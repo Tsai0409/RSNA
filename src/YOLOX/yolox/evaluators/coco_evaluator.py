@@ -292,7 +292,7 @@ class COCOEvaluator:
                 # cocoDt = cocoGt.loadRes(tmp)
                 # --- monkey patch: prevent KeyError if 'info' is missing
                 if not hasattr(cocoGt, "dataset") or "info" not in cocoGt.dataset:
-                    cocoGt.dataset["info"] = {"description": "dummy"}
+                    cocoGt.dataset["info"] = {"description": "auto-patched for evaluation"}
 
                 cocoDt = cocoGt.loadRes(tmp)
             try:
