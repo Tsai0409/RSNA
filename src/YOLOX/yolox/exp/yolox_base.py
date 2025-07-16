@@ -40,9 +40,13 @@ class Exp(BaseExp):
         # dir of dataset images, if data_dir is None, this project will use `datasets` dir
         self.data_dir = None
         # name of annotation file for training
-        self.train_ann = "instances_train2017.json"
+        # self.train_ann = "instances_train2017.json"
+        self.train_ann = "train_rsna_axial_all_images_right_yolox_x___train_axial_for_yolo_all_image_v1_fold0_len9611.json"
+
         # name of annotation file for evaluation
-        self.val_ann = "instances_val2017.json"
+        # self.val_ann = "instances_val2017.json"
+        self.val_ann = "valid_rsna_axial_all_images_right_yolox_x___train_axial_for_yolo_all_image_v1_fold0_len1924.json"
+
         # name of annotation file for testing
         self.test_ann = "instances_test2017.json"
 
