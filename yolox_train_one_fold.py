@@ -123,14 +123,14 @@ if 'y_max' not in list(cfg.train_df):
 sys.path.append("/kaggle/working/duplicate/src/YOLOX")
 os.chdir('/kaggle/working/duplicate/src/YOLOX')
 
-print(f'\n----------------------- Config -----------------------')
-config_str = ''
-for k, v in vars(cfg).items():
-    if (k == 'model') | ('df' in k):
-        continue
-    print(f'\t{k}: {v}')
-    config_str += f'{k}: {v}, '
-print(f'----------------------- Config -----------------------\n')
+# print(f'\n----------------------- Config -----------------------')
+# config_str = ''
+# for k, v in vars(cfg).items():
+#     if (k == 'model') | ('df' in k):
+#         continue
+#     print(f'\t{k}: {v}')
+#     config_str += f'{k}: {v}, '
+# print(f'----------------------- Config -----------------------\n')
 
 
 config_path = f'configfile_{config}_fold{fold}.py'
