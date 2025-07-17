@@ -79,7 +79,7 @@ oof['pred_spinal'] = oof[[c for c in pred_cols if 'spinal' in c]].mean(1)  # 用
 oof['pred_right_neural'] = oof[[c for c in pred_cols if 'right_neural' in c]].mean(1)
 oof['pred_left_neural'] = oof[[c for c in pred_cols if 'left_neural' in c]].mean(1)
 # oof.to_csv('results/rsna_sagittal_cl/oof.csv', index=False)
-oof.to_csv('oof.csv', index=False)
+oof.to_csv('sagittal_oof.csv', index=False)
 # print('preprocess_for_sagittal_yolo.py finish')
 
 test = pd.concat([pd.read_csv(f'{WORKING_DIR}/ckpt/rsna_sagittal_cl/test_fold1.csv') for fold in range(1)])  # 在 slice estimation 最後得到各個類別的分數
@@ -88,7 +88,8 @@ test[pred_cols] = sigmoid(test[pred_cols])
 test['pred_spinal'] = test[[c for c in pred_cols if 'spinal' in c]].mean(1)  # 用有做 sigmoid 的結果去平均
 test['pred_right_neural'] = test[[c for c in pred_cols if 'right_neural' in c]].mean(1)
 test['pred_left_neural'] = test[[c for c in pred_cols if 'left_neural' in c]].mean(1)
-test.to_csv('test.csv', index=False)
+test.to_csv('sagittal_test.csv', index=False)
 print('preprocess_for_sagittal_yolo.py finish')
+
 # train_for_yolo_10level_v1.csv 找出 bounding box 的位置
 # test.csv 找出 每個類別的各自的分數(包含是哪個 slice 的資訊)
