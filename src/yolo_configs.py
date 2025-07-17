@@ -161,14 +161,22 @@ class rsna_10classes_yolox_x(Baseline):
         self.train_df_path = f'{WORKING_DIR}/csv_train/region_estimation_by_yolox_holdout_6/train_for_yolo_10level_v1.csv'
         # self.test_df_path = 'input/train_with_fold.csv'
         # self.test_df_path = f'{WORKING_DIR}/csv_train/preprocess_4/train_with_fold.csv'
-        self.test_df_path = f'{WORKING_DIR}/csv_train/preprocess_holdout_4/train_with_fold_holdout_test.csv'
+        # self.test_df_path = f'{WORKING_DIR}/csv_train/preprocess_holdout_4/train_with_fold_holdout_test.csv'
         self.train_df = pd.read_csv(self.train_df_path)
-        self.test_df = pd.read_csv(self.test_df_path)
+        # self.test_df = pd.read_csv(self.test_df_path)
         # oof = pd.read_csv(f'results/rsna_sagittal_cl/oof.csv')
         # oof = pd.read_csv(f'{WORKING_DIR}/csv_train/region_estimation_by_yolox_6/oof.csv')
-        oof = pd.read_csv(f'{WORKING_DIR}/csv_train/region_estimation_by_yolox_holdout_6/oof.csv')
+        # oof = pd.read_csv(f'{WORKING_DIR}/csv_train/region_estimation_by_yolox_holdout_6/oof.csv')
+        # dfs = []
+        # for id, idf in oof.groupby('series_id'):
+        #     idf = idf.sort_values(['x_pos', 'instance_number'])
+        #     idf = idf.drop_duplicates('x_pos')
+        #     ldf = idf[idf['pred_spinal']==idf['pred_spinal'].max()].iloc[:1]
+        #     dfs.append(ldf)
+        # self.test_df = pd.concat(dfs)
+        test = pd.read_csv(f'{WORKING_DIR}/csv_train/region_estimation_by_yolox_holdout_6/sagittal_test.csv')
         dfs = []
-        for id, idf in oof.groupby('series_id'):
+        for id, idf in test.groupby('series_id'):
             idf = idf.sort_values(['x_pos', 'instance_number'])
             idf = idf.drop_duplicates('x_pos')
             ldf = idf[idf['pred_spinal']==idf['pred_spinal'].max()].iloc[:1]
