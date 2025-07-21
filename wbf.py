@@ -1,4 +1,5 @@
-from src.utils.ensemble_boxes import *
+# wbf.py (且去除掉重複和低信心預測)
+from src.utils.ensemble_boxes import *  # weighted_boxes_fusion 我猜
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
@@ -7,26 +8,51 @@ import warnings
 warnings.simplefilter('ignore')
 from multiprocessing import cpu_count
 
+# 在 kaggle 執行時使用
+# wbf_path = "/kaggle/working/duplicate"
+# !python3 {wbf_path}/wbf.py --configs rsna_10classes_yolox_x
+
+# kaggle input
+DATA_KAGGLE_DIR = "/kaggle/input/rsna-2024-lumbar-spine-degenerative-classification"
+
+# 設定環境變數
+WORKING_DIR="/kaggle/working/duplicate"
+
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("--configs", '-c', nargs='+', type=str, default=['test'])
-parser.add_argument('--fold', '-f', nargs='+', type=int, default=[0,1,2,3,4])
+# parser.add_argument("--configs", '-c', nargs='+', type=str, default=['rsna_axial_all_images_left_yolox_x'])
+# parser.add_argument('--fold', '-f', nargs='+', type=int, default=[0,1,2,3,4])
+parser.add_argument('--fold', '-f', nargs='+', type=int, default=[1])  # for rsna_10classes_yolox_x
+# parser.add_argument('--fold', '-f', nargs='+', type=int, default=[0])  # for rsna_axial_all_images_left_yolox_x\rsna_axial_all_images_right_yolox_x
 args = parser.parse_args()
 
 configs = args.configs
 
 from src.yolo_configs import *
-cfg = eval(configs[0])()
+cfg = eval(configs[0])()  # configs = {rsna_axial_all_images_left_yolox_x}
+# 假設你有一個字典或模塊，其中包含所有類
+# class_map = {
+#     "rsna_axial_all_images_left_yolox_x": rsna_axial_all_images_left_yolox_x,
+#     "rsna_axial_all_images_right_yolox_x": rsna_axial_all_images_right_yolox_x,
+#     "rsna_10classes_yolox_x": rsna_10classes_yolox_x
+# }
+# 根據 configs[0] 來獲取類並創建實例
+# cfg_class = class_map[configs[0]]  # 根據配置獲取對應的類
+# cfg = cfg_class()  # 創建該類的實例
+# print(cfg)
 
 tests = []
 for model_n, config in enumerate(configs):
-    for fold in args.fold:
-        test = pd.read_csv(f'results/{config}/test_fold{fold}.csv')
-        test['model_n'] = f'{model_n}_fold{fold}'
+    for fold in args.fold:  # default=[0,1]
+        # test = pd.read_csv(f'results/{config}/test_fold{fold}.csv')
+        test = pd.read_csv(f'{WORKING_DIR}/results/{config}/test_fold{fold}.csv')  # rsna_axial_all_images_left_yolox_x/test_fold0.csv (sagittal region estimation)
+        print('configs = ', config)  # 我加
+        test['model_n'] = f'{model_n}_fold{fold}'  # 1_fold0、1_fold1
         tests.append(test)
 test = pd.concat(tests)
 box_cols = ['x_min', 'y_min', 'x_max', 'y_max']
-weights = [1]* len(tests)
+weights = [1]*len(tests)
 iou_thr = 0.5
 skip_box_thr = 0.0001
 results = []
@@ -70,9 +96,10 @@ p.close()
 
 results = pd.DataFrame(wbf_result_maps_list)
 
-os.makedirs(f'results/wbf', exist_ok=True)
+# os.makedirs(f'results/wbf', exist_ok=True)
+os.makedirs(f'{WORKING_DIR}/results/wbf', exist_ok=True)
 print('='*100)
 filename = "_".join(configs)
-print(f"pd.read_csv(f\'results/wbf/{filename}.csv\')")
+print(f"pd.read_csv(f\'{WORKING_DIR}/results/wbf/{filename}.csv\')")
 print('='*100)
-results.to_csv(f'results/wbf/{"_".join(configs)}.csv', index=False)
+results.to_csv(f'{WORKING_DIR}/results/wbf/{"_".join(configs)}.csv', index=False)
