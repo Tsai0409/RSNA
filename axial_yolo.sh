@@ -12,8 +12,8 @@ export PYTHONPATH=/kaggle/working/duplicate/src/YOLOX:$PYTHONPATH  # 新增
 
 # 配置名稱與摺疊數
 # configs=("rsna_axial_all_images_left_yolox_x" "rsna_axial_all_images_right_yolox_x")
-# configs=("rsna_axial_all_images_left_yolox_x")
-configs=("rsna_axial_all_images_right_yolox_x")
+configs=("rsna_axial_all_images_left_yolox_x")
+# configs=("rsna_axial_all_images_right_yolox_x")
 folds=(1)
 
 # 檢查所需的腳本是否存在
