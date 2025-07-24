@@ -1,4 +1,4 @@
-# wbf.py (且去除掉重複和低信心預測)
+# wbf.py (且去除掉重複和低信心預測) -> 針對 sagittal
 from src.utils.ensemble_boxes import *  # weighted_boxes_fusion 我猜
 import pandas as pd
 import numpy as np
