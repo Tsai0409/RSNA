@@ -21,8 +21,8 @@ box_cols = ['x_min', 'y_min', 'x_max', 'y_max']
 # tr = pd.read_csv(f'{WORKING_DIR}/csv_train/preprocess_4/train_with_fold.csv')
 tr = pd.read_csv(f'{WORKING_DIR}/csv_train/preprocess_holdout_4/train_with_fold_holdout.csv')  # 所有狀態的資訊
 # oof = pd.concat([pd.read_csv(f'results/{config}/oof_fold{fold}.csv') for fold in range(5)])
-oof = pd.concat([pd.read_csv(f'{WORKING_DIR}/results/{config}/oof_fold1.csv') for fold in range(1)])  # version-34 (sagittal 中 valid 預測出來的 bounding box 資訊)
-oof.to_csv('oof.csv')  # 我加 → Dataframe1
+oof = pd.concat([pd.read_csv(f'{WORKING_DIR}/results/{config}/oof_fold1.csv') for fold in range(1)])  # sagittal 中 valid 預測出來的 bounding box 資訊
+# oof.to_csv('oof.csv')  # 我加 → Dataframe1
 # test = pd.read_csv(f'results/wbf/{config}.csv')
 test = pd.read_csv(f'{WORKING_DIR}/results/wbf/{config}.csv')  # wbf/rsna_10classes_yolox_x.csv 經過整理過後的 bounding box (用 test 的資料)
 test['study_id'] = test.path.apply(lambda x: int(x.split('/')[-1].split('___')[0]))
@@ -30,7 +30,7 @@ test['series_id'] = test.path.apply(lambda x: int(x.split('/')[-1].split('___')[
 test = test[~test['study_id'].isin(oof.study_id)]  # 將在 oof 中有出現的 study_id 全部移除
 t2_ids = tr[tr.series_description_y == 'Sagittal T2/STIR'].series_id  # 留下 Spinal
 test = test[test['series_id'].isin(t2_ids)]
-test.to_csv('test.csv')  # 我加 → Dataframe2
+# test.to_csv('test.csv')  # 我加 → Dataframe2
 
 dfs = []
 for i, idf in test.groupby('study_id'):  # 每個 study_id 對應 只能有一個 series_id
@@ -71,7 +71,8 @@ range_n = 2
 # spinal
 dfs = []
 # df_path = 'results/rsna_sagittal_cl/oof.csv'
-df_path = f'{WORKING_DIR}/ckpt/rsna_sagittal_cl/oof.csv'  # slice estimation 的結果  region_estimation_by_yolox_6/oof.csv
+# df_path = f'{WORKING_DIR}/ckpt/rsna_sagittal_cl/oof.csv'  # slice estimation 的結果 region_estimation_by_yolox_6/oof.csv
+df_path = f'{WORKING_DIR}/csv_train/region_estimation_by_yolox_holdout_6/sagittal_oof.csv'  # slice estimation 的結果 region_estimation_by_yolox_holdout_6/sagittal_oof.csv (preprocess_for_sagittal_yolo.py 產生)
 df = pd.read_csv(df_path)
 # df['path'] = f'input/sagittal_all_images/' + df.study_id.astype(str) + '___' + df.instance_number.astype(str) + '.png'
 df['path'] = f'/kaggle/temp/sagittal_all_images/' + df.study_id.astype(str) + '___' + df.instance_number.astype(str) + '.png'  # 將原本 study_id___series_id___instance_number -> series_id___instance_number
@@ -116,7 +117,7 @@ df.to_csv('/kaggle/working/df2.csv')  # 我加
 
 # tr = pd.read_csv('input/train.csv')
 tr = pd.read_csv(f'{WORKING_DIR}/kaggle_csv/train.csv')
-df = df.merge(tr, on='study_id')
+df = df.merge(tr, on='study_id')  # 檢查是不是 inner join -> 只保留兩者皆有的？
 dfs = []
 for level, idf in df.groupby('level'):
     for col in ['spinal_canal_stenosis', 'left_neural_foraminal_narrowing', 'right_neural_foraminal_narrowing', 'right_subarticular_stenosis', 'left_subarticular_stenosis']:
@@ -174,7 +175,7 @@ error_data = df[df['study_id'].isin(incomplete_ids)].copy()
 # 10. 從 df 中排除這些 study_id
 df = df[~df['study_id'].isin(incomplete_ids)].copy()
 
-p = 'sagittal_spinal_range2_rolling5.csv'  # 不知道為什麼只有 left 的資料
+p = 'sagittal_spinal_range2_rolling5.csv'  # 不知道為什麼只有 left 的資料 -> train
 df.to_csv(p, index=False)
 print(p)
 
@@ -184,7 +185,8 @@ print(p)
 for left_right in ['left', 'right']:
     dfs = []
     # df_path = 'results/rsna_sagittal_cl/oof.csv'
-    df_path = f'{WORKING_DIR}/ckpt/rsna_sagittal_cl/oof.csv'  # slice estimation 的結果 region_estimation_by_yolox_6/oof.csv
+    # df_path = f'{WORKING_DIR}/ckpt/rsna_sagittal_cl/oof.csv'  # slice estimation 的結果 region_estimation_by_yolox_6/oof.csv
+    df_path = f'{WORKING_DIR}/csv_train/region_estimation_by_yolox_holdout_6/sagittal_oof.csv'  # slice estimation 的結果 region_estimation_by_yolox_holdout_6/sagittal_oof.csv (preprocess_for_sagittal_yolo.py 產生)
     df = pd.read_csv(df_path)
     # sdf = pd.read_csv('input/train_series_descriptions.csv')
     sdf = pd.read_csv(f'{WORKING_DIR}/kaggle_csv/train_series_descriptions.csv')
@@ -287,7 +289,8 @@ for left_right in ['left', 'right']:
 for left_right in ['left', 'right']:
     dfs = []
     # df_path = 'results/rsna_sagittal_cl/oof.csv'
-    df_path = f'{WORKING_DIR}/ckpt/rsna_sagittal_cl/oof.csv'
+    # df_path = f'{WORKING_DIR}/ckpt/rsna_sagittal_cl/oof.csv'
+    df_path = f'{WORKING_DIR}/csv_train/region_estimation_by_yolox_holdout_6/sagittal_oof.csv'  # slice estimation 的結果 region_estimation_by_yolox_holdout_6/sagittal_oof.csv (preprocess_for_sagittal_yolo.py 產生)
     df = pd.read_csv(df_path)
     # sdf = pd.read_csv('input/train_series_descriptions.csv')
     sdf = pd.read_csv(f'{WORKING_DIR}/kaggle_csv/train_series_descriptions.csv')
