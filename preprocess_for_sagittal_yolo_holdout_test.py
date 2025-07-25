@@ -1,4 +1,4 @@
-# preprocess_for_sagittal_yolo.py
+# preprocess_for_sagittal_yolo_holdout_test.py -> 直接在 kaggle 上執行
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
