@@ -68,7 +68,7 @@ df['y_max'] = df[['right_y_max', 'left_y_max']].max(1)
 df.to_csv('axial_yolo_results_holdout.csv')
 
 # boxdf = pd.read_csv('results/axial_yolo_results.csv')
-boxdf = pd.read_csv('kaggle/working/axial_yolo_results_holdout.csv')
+boxdf = pd.read_csv('/kaggle/working/axial_yolo_results_holdout.csv')
 boxdf = boxdf[['path','x_min', 'y_min', 'x_max', 'y_max']]
 # boxdf.to_csv('/kaggle/working/boxdf.csv')  # 我加
 # tr.to_csv('/kaggle/working/tr.csv')  # 我加
