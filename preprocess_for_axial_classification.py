@@ -35,7 +35,8 @@ for col in label_features:  # 轉為 one-hot vector；一張 圖片 真的可以
         tr.loc[((tr[col+'_'+level]=='Normal/Mild') & (tr['pred_level']==level_n+1)), f'{col}_normal'] = 1
         tr.loc[((tr[col+'_'+level]=='Moderate') & (tr['pred_level']==level_n+1)), f'{col}_moderate'] = 1
         tr.loc[((tr[col+'_'+level]=='Severe') & (tr['pred_level']==level_n+1)), f'{col}_severe'] = 1
-tr.to_csv('/kaggle/working/tr.csv')  # 我加
+# tr.to_csv('/kaggle/working/tr.csv')  # 我加
+tr.to_csv('tr.csv')  # 我加
 
 # axial right
 # test = pd.read_csv('results/rsna_axial_all_images_right_yolox_x/test_fold0.csv')
@@ -63,16 +64,17 @@ df['y_min'] = df[['right_y_min', 'left_y_min']].min(1)
 df['x_max'] = df[['right_x_max', 'left_x_max']].max(1)
 df['y_max'] = df[['right_y_max', 'left_y_max']].max(1)
 # df.to_csv('results/axial_yolo_results.csv', index=False)
-df.to_csv(f'{WORKING_DIR}/csv_train/axial_classification_holdout_7/axial_yolo_results_holdout.csv')
+# df.to_csv(f'{WORKING_DIR}/csv_train/axial_classification_holdout_7/axial_yolo_results_holdout.csv')
+df.to_csv('axial_yolo_results_holdout.csv')
 
 # boxdf = pd.read_csv('results/axial_yolo_results.csv')
-boxdf = pd.read_csv(f'{WORKING_DIR}/csv_train/axial_classification_holdout_7/axial_yolo_results_holdout.csv')
+boxdf = pd.read_csv('kaggle/working/axial_yolo_results_holdout.csv')
 boxdf = boxdf[['path','x_min', 'y_min', 'x_max', 'y_max']]
 # boxdf.to_csv('/kaggle/working/boxdf.csv')  # 我加
 # tr.to_csv('/kaggle/working/tr.csv')  # 我加
 # boxdf.path = boxdf.path.apply(lambda x: 'input/' + x.split('/input/')[-1])  # 這行不用加
 train_df = tr.merge(boxdf, on='path')
-# train_df.to_csv('/kaggle/working/train_df.csv')  # 我加
+train_df.to_csv('train_df.csv')  # 我加
 
 import cv2
 from multiprocessing import Pool, cpu_count
@@ -92,7 +94,8 @@ p.close()
 train_df[['image_height', 'image_width']] = np.array(results)
 
 # train_df.to_csv('input/axial_classification.csv', index=False)
-train_df.to_csv(f'{WORKING_DIR}/csv_train/axial_classification_holdout_7/axial_classification_holdout.csv', index=False)
+# train_df.to_csv(f'{WORKING_DIR}/csv_train/axial_classification_holdout_7/axial_classification_holdout.csv', index=False)
+train_df.to_csv('axial_classification_holdout.csv', index=False)
 # print('save to input/axial_classification.csv')
-print('save to csv_train/axial_classification_holdout_7/axial_classification_holdout.csv')
+print('save to axial_classification_holdout.csv')
 print('preprocess_for_axial_classification.py finish')
