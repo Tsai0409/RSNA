@@ -35,7 +35,7 @@ for col in label_features:  # 轉為 one-hot vector；一張 圖片 真的可以
         tr.loc[((tr[col+'_'+level]=='Normal/Mild') & (tr['pred_level']==level_n+1)), f'{col}_normal'] = 1
         tr.loc[((tr[col+'_'+level]=='Moderate') & (tr['pred_level']==level_n+1)), f'{col}_moderate'] = 1
         tr.loc[((tr[col+'_'+level]=='Severe') & (tr['pred_level']==level_n+1)), f'{col}_severe'] = 1
-# tr.to_csv('/kaggle/working/tr.csv')  # 我加
+tr.to_csv('/kaggle/working/tr.csv')  # 我加
 
 # axial right
 # test = pd.read_csv('results/rsna_axial_all_images_right_yolox_x/test_fold0.csv')
