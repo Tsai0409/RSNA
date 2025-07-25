@@ -70,8 +70,8 @@ df.to_csv('axial_yolo_results_holdout.csv')
 # boxdf = pd.read_csv('results/axial_yolo_results.csv')
 boxdf = pd.read_csv('/kaggle/working/axial_yolo_results_holdout.csv')
 boxdf = boxdf[['path','x_min', 'y_min', 'x_max', 'y_max']]
-# boxdf.to_csv('/kaggle/working/boxdf.csv')  # 我加
-# tr.to_csv('/kaggle/working/tr.csv')  # 我加
+boxdf.to_csv('boxdf.csv')  # 我加
+tr.to_csv('tr.csv')  # 我加
 # boxdf.path = boxdf.path.apply(lambda x: 'input/' + x.split('/input/')[-1])  # 這行不用加
 train_df = tr.merge(boxdf, on='path')
 train_df.to_csv('train_df.csv')  # 我加
