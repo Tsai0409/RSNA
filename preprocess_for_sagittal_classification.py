@@ -118,6 +118,7 @@ df.to_csv('/kaggle/working/df2.csv')  # 我加
 # tr = pd.read_csv('input/train.csv')
 tr = pd.read_csv(f'{WORKING_DIR}/kaggle_csv/train.csv')
 df = df.merge(tr, on='study_id')  # 檢查是不是 inner join -> 只保留兩者皆有的？
+df.to_csv('/kaggle/working/df3.csv')  # 我加
 dfs = []
 for level, idf in df.groupby('level'):
     for col in ['spinal_canal_stenosis', 'left_neural_foraminal_narrowing', 'right_neural_foraminal_narrowing', 'right_subarticular_stenosis', 'left_subarticular_stenosis']:
