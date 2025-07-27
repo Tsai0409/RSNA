@@ -25,7 +25,7 @@ configs=(
     "rsna_axial_spinal_dis3_crop_x1_y2"
 )
 # folds=(0 1 2 3 4)
-folds=(0)
+folds=(1)
 
 # 遍歷配置和摺疊數進行訓練與預測
 for config in "${configs[@]}"

@@ -235,235 +235,7 @@ class rsna_sagittal_cl(rsna_v1):  # inf_sagittal_slice_2nd.sh
         self.predict_train = True
         self.train_2nd_df = pd.read_csv(f'{WORKING_DIR}/csv_train/preprocess_holdout_4/train_with_fold_holdout.csv')
 
-# ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-# classification for axial (stage 2)
-class rsna_axial_spinal_crop_base(rsna_v1):
-    def __init__(self, fold=0):
-        super().__init__()
-        self.fold = fold  # 我加
-#        self.train_df_path = 'input/axial_classification.csv'
-        self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_7/axial_classification.csv'
-        self.train_df = pd.read_csv(self.train_df_path)
 
-        cols = []
-        label_features = [
-            'spinal_canal_stenosis',
-        ]
-        for col in label_features:
-            cols.append(f'{col}_normal')
-            cols.append(f'{col}_moderate')
-            cols.append(f'{col}_severe')
-
-        self.label_features = cols
-        self.num_classes = len(self.label_features)
-        self.model_name = 'convnext_small.in12k_ft_in1k_384'
-        self.image_size = 384
-        self.drop_rate = 0.0
-        self.drop_path_rate = 0.0
-        self.model = timm.create_model(self.model_name, pretrained=True, num_classes=self.num_classes,
-            drop_rate=self.drop_rate, drop_path_rate=self.drop_path_rate)
-        self.metric = None
-        self.memo = ''
-        self.batch_size = 8
-        self.grad_accumulations = 2
-        self.crop_by_xy = False
-        self.rsna_2024_multi_image = False
-        self.rsna_random_sample = False
-        self.lr = 5.5e-5
-        self.rsna_2024_agg_val = False
-        self.epochs = 7
-        self.transform = medical_v3
-        self.box_crop = True
-        self.box_crop_x_ratio = 2
-        self.box_crop_y_ratio = 6
-
-class rsna_axial_spinal_dis3_crop_x05_y6(rsna_axial_spinal_crop_base):
-    def __init__(self):
-        super().__init__()
-        self.box_crop_x_ratio = 0.5
-        self.box_crop_y_ratio = 6
-
-class rsna_axial_spinal_dis3_crop_x1_y2(rsna_axial_spinal_crop_base):
-    def __init__(self):
-        super().__init__()
-        self.box_crop_x_ratio = 1
-        self.box_crop_y_ratio = 2
-
-# ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-# reduce_noise axial (stage 2)
-# version1
-# class rsna_axial_spinal_dis3_crop_x05_y6_reduce_noise(rsna_axial_spinal_dis3_crop_x05_y6):
-#     def __init__(self):
-#         super().__init__()
-#         self.train_df['level'] = self.train_df.pred_level.map({
-#             1: 'l1_l2',
-#             2: 'l2_l3',
-#             3: 'l3_l4',
-#             4: 'l4_l5',
-#             5: 'l5_s1',
-#         })
-#         noise_df = pd.read_csv(f'results/noisy_target_level_1016.csv')
-#         noise_df = noise_df[noise_df.target=='spinal_canal_stenosis']
-#         self.train_df['study_level'] = self.train_df.study_id.astype(str) + '_' + self.train_df.level.apply(lambda x: x.replace('/', '_').lower())
-#         self.train_df = self.train_df[~self.train_df.study_level.isin(noise_df.study_level)]
-
-# version2
-# class rsna_axial_spinal_dis3_crop_x05_y6_reduce_noise(rsna_axial_spinal_dis3_crop_x05_y6):
-#     def __init__(self, fold=0):
-#         super().__init__()
-
-#         self.fold = fold  # 儲存fold參數
-#         self.train_df_path = f'{WORKING_DIR}/csv_train/axial_classification_7/axial_classification.csv'
-#         self.train_df = pd.read_csv(self.train_df_path)
-#         self.train_df['level'] = self.train_df.pred_level.map({
-#             1: 'l1_l2',
-#             2: 'l2_l3',
-#             3: 'l3_l4',
-#             4: 'l4_l5',
-#             5: 'l5_s1',
-#         })
-
-#         # noise_df = pd.read_csv(f'results/noisy_target_level_1016.csv')
-#         noise_df = pd.read_csv(f'{WORKING_DIR}/csv_train/noise_reduction_by_oof_9/noisy_target_level_th09.csv')
-#         noise_df = noise_df[noise_df.target == 'spinal_canal_stenosis']
-#         self.train_df['study_level'] = self.train_df.study_id.astype(str) + '_' + self.train_df.level.str.replace('/', '_').str.lower()
-#         self.train_df = self.train_df[~self.train_df.study_level.isin(noise_df.study_level)]
-
-#         # add image location info
-#         self.train_df['left_right'] = 'center'
-
-#         # assign relevant columns (no renaming necessary)
-#         cols = [
-#             'spinal_canal_stenosis_normal',
-#             'spinal_canal_stenosis_moderate',
-#             'spinal_canal_stenosis_severe',
-#         ]
-        # for c in cols:
-        #     self.train_df[c] = self.train_df[c].values
-
-# version1
-# class rsna_axial_spinal_dis3_crop_x1_y2_reduce_noise(rsna_axial_spinal_dis3_crop_x1_y2):
-#     def __init__(self):
-#         super().__init__()
-#         self.train_df['level'] = self.train_df.pred_level.map({
-#             1: 'l1_l2',
-#             2: 'l2_l3',
-#             3: 'l3_l4',
-#             4: 'l4_l5',
-#             5: 'l5_s1',
-#         })
-#         noise_df = pd.read_csv(f'results/noisy_target_level_1016.csv')
-#         noise_df = noise_df[noise_df.target=='spinal_canal_stenosis']
-#         self.train_df['study_level'] = self.train_df.study_id.astype(str) + '_' + self.train_df.level.apply(lambda x: x.replace('/', '_').lower())
-#         self.train_df = self.train_df[~self.train_df.study_level.isin(noise_df.study_level)]
-
-# version2
-# class rsna_axial_spinal_dis3_crop_x1_y2_reduce_noise(rsna_axial_spinal_dis3_crop_x1_y2):
-#     def __init__(self, fold=0):
-#         super().__init__()
-
-#         self.fold = fold  # 儲存fold參數
-#         self.train_df_path = f'{WORKING_DIR}/csv_train/axial_classification_7/axial_classification.csv'
-#         self.train_df = pd.read_csv(self.train_df_path)
-#         self.train_df['level'] = self.train_df.pred_level.map({
-#             1: 'l1_l2',
-#             2: 'l2_l3',
-#             3: 'l3_l4',
-#             4: 'l4_l5',
-#             5: 'l5_s1',
-#         })
-
-#         # noise_df = pd.read_csv(f'results/noisy_target_level_1016.csv')
-#         noise_df = pd.read_csv(f'{WORKING_DIR}/csv_train/noise_reduction_by_oof_9/noisy_target_level_th09.csv')
-#         noise_df = noise_df[noise_df.target == 'spinal_canal_stenosis']
-#         self.train_df['study_level'] = self.train_df.study_id.astype(str) + '_' + self.train_df.level.str.replace('/', '_').str.lower()
-#         self.train_df = self.train_df[~self.train_df.study_level.isin(noise_df.study_level)]
-
-#         self.train_df['left_right'] = 'center'
-
-#         cols = [
-#             'spinal_canal_stenosis_normal',
-#             'spinal_canal_stenosis_moderate',
-#             'spinal_canal_stenosis_severe',
-#         ]
-        # for c in cols:
-        #     self.train_df[c] = self.train_df[c].values
-
-# ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-# reduce_noise axial (stage 2)
-# train(by clean data) vaild(by original data)
-class rsna_axial_spinal_dis3_crop_x05_y6_with_valid(rsna_axial_spinal_dis3_crop_x05_y6):
-    def __init__(self, fold=0):
-        super().__init__()
-
-        self.fold = fold
-        self.train_df_path = f'{WORKING_DIR}/csv_train/axial_classification_7/axial_classification.csv'
-
-        # 讀取原始資料
-        valid_df = pd.read_csv(self.train_df_path)
-        valid_df['level'] = valid_df.pred_level.map({
-            1: 'l1_l2',
-            2: 'l2_l3',
-            3: 'l3_l4',
-            4: 'l4_l5',
-            5: 'l5_s1',
-        })
-        valid_df['study_level'] = valid_df.study_id.astype(str) + '_' + valid_df.level.str.replace('/', '_').str.lower()
-        valid_df['left_right'] = 'center'  # 中央對稱特徵
-
-        self.valid_df = valid_df.copy()  # 保留全部資料給 valid_df
-
-        # 建立 train_df：過濾 noisy 標籤資料
-        noise_df = pd.read_csv(f'{WORKING_DIR}/csv_train/noise_reduction_by_oof_9/noisy_target_level_th09.csv')
-        noise_df = noise_df[noise_df.target == 'spinal_canal_stenosis']
-        noisy_study_levels = set(noise_df.study_level)
-
-        self.train_df = valid_df[~valid_df.study_level.isin(noisy_study_levels)].reset_index(drop=True)
-
-        # 指定分類欄位（這裡無需重新命名）
-        cols = [
-            'spinal_canal_stenosis_normal',
-            'spinal_canal_stenosis_moderate',
-            'spinal_canal_stenosis_severe',
-        ]
-
-class rsna_axial_spinal_dis3_crop_x1_y2_with_valid(rsna_axial_spinal_dis3_crop_x1_y2):
-    def __init__(self, fold=0):
-        super().__init__()
-
-        self.fold = fold
-        self.train_df_path = f'{WORKING_DIR}/csv_train/axial_classification_7/axial_classification.csv'
-
-        # 讀取完整資料
-        valid_df = pd.read_csv(self.train_df_path)
-        valid_df['level'] = valid_df.pred_level.map({
-            1: 'l1_l2',
-            2: 'l2_l3',
-            3: 'l3_l4',
-            4: 'l4_l5',
-            5: 'l5_s1',
-        })
-        valid_df['study_level'] = valid_df.study_id.astype(str) + '_' + valid_df.level.str.replace('/', '_').str.lower()
-        valid_df['left_right'] = 'center'
-
-        # 保留全部資料給 valid_df
-        self.valid_df = valid_df.copy()
-
-        # 載入 noisy 標記，並過濾 train_df
-        noise_df = pd.read_csv(f'{WORKING_DIR}/csv_train/noise_reduction_by_oof_9/noisy_target_level_th09.csv')
-        noise_df = noise_df[noise_df.target == 'spinal_canal_stenosis']
-        noisy_study_levels = set(noise_df.study_level)
-
-        self.train_df = valid_df[~valid_df.study_level.isin(noisy_study_levels)].reset_index(drop=True)
-
-        # 指定欄位（實際用途可能在 downstream 過程）
-        self.cols = [
-            'spinal_canal_stenosis_normal',
-            'spinal_canal_stenosis_moderate',
-            'spinal_canal_stenosis_severe',
-        ]
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # classification for axial (stage 1)
@@ -511,8 +283,9 @@ class rsna_axial_ss_nfn_x2_y2_center_pad0(rsna_axial_ss_nfn_crop_base):
         self.box_crop_y_ratio = 2  # 以「偵測框中心」為基準，上下各取 1/2 範圍
         center_pad_ratio = 0  # 調整裁切區域是否左右偏移
 
-#        self.train_df_path = 'input/axial_classification.csv'
-        self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_7/axial_classification.csv'
+        # self.train_df_path = 'input/axial_classification.csv'
+        # self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_7/axial_classification.csv'
+        self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_holdout_7/axial_classification_holdout.csv'
         self.train_df = pd.read_csv(self.train_df_path)
         self.train_df['x_min'] = (self.train_df.x_max + self.train_df.x_min)/2
         del self.train_df['x_max']
@@ -558,8 +331,9 @@ class rsna_axial_ss_nfn_x2_y6_center_pad0(rsna_axial_ss_nfn_crop_base):
         self.box_crop_y_ratio = 6
         center_pad_ratio = 0
 
-#        self.train_df_path = 'input/axial_classification.csv'
-        self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_7/axial_classification.csv'
+        # self.train_df_path = 'input/axial_classification.csv'
+        # self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_7/axial_classification.csv'
+        self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_holdout_7/axial_classification_holdout.csv'
         self.train_df = pd.read_csv(self.train_df_path)
         self.train_df['x_min'] = (self.train_df.x_max + self.train_df.x_min)/2
         del self.train_df['x_max']
@@ -605,8 +379,9 @@ class rsna_axial_ss_nfn_x2_y8_center_pad10(rsna_axial_ss_nfn_crop_base):
         self.box_crop_y_ratio = 8
         center_pad_ratio = 10
 
-#        self.train_df_path = 'input/axial_classification.csv'
-        self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_7/axial_classification.csv'
+        # self.train_df_path = 'input/axial_classification.csv'
+        # self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_7/axial_classification.csv'
+        self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_holdout_7/axial_classification_holdout.csv'
         self.train_df = pd.read_csv(self.train_df_path)
         self.train_df['x_min'] = (self.train_df.x_max + self.train_df.x_min)/2
         del self.train_df['x_max']
@@ -1113,6 +888,239 @@ class rsna_axial_ss_nfn_x2_y8_center_pad10_with_valid(rsna_axial_ss_nfn_crop_bas
         noise_study_levels = set(noise_df_left.study_level) | set(noise_df_right.study_level)
 
         self.train_df = self.valid_df[~self.valid_df.study_level.isin(noise_study_levels)].reset_index(drop=True)
+
+# ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# classification for axial (stage 2)
+class rsna_axial_spinal_crop_base(rsna_v1):
+    def __init__(self, fold=0):
+        super().__init__()
+        self.fold = fold  # 我加
+        # self.train_df_path = 'input/axial_classification.csv'
+        # self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_7/axial_classification.csv'
+        self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_holdout_7/axial_classification_holdout.csv'
+        self.train_df = pd.read_csv(self.train_df_path)
+
+        cols = []
+        label_features = [
+            'spinal_canal_stenosis',
+        ]
+        for col in label_features:
+            cols.append(f'{col}_normal')
+            cols.append(f'{col}_moderate')
+            cols.append(f'{col}_severe')
+
+        self.label_features = cols
+        self.num_classes = len(self.label_features)
+        self.model_name = 'convnext_small.in12k_ft_in1k_384'
+        self.image_size = 384
+        self.drop_rate = 0.0
+        self.drop_path_rate = 0.0
+        self.model = timm.create_model(self.model_name, pretrained=True, num_classes=self.num_classes,
+            drop_rate=self.drop_rate, drop_path_rate=self.drop_path_rate)
+        self.metric = None
+        self.memo = ''
+        self.batch_size = 8
+        self.grad_accumulations = 2
+        self.crop_by_xy = False
+        self.rsna_2024_multi_image = False
+        self.rsna_random_sample = False
+        self.lr = 5.5e-5
+        self.rsna_2024_agg_val = False
+        self.epochs = 7
+        self.transform = medical_v3
+        self.box_crop = True
+        self.box_crop_x_ratio = 2
+        self.box_crop_y_ratio = 6
+
+class rsna_axial_spinal_dis3_crop_x05_y6(rsna_axial_spinal_crop_base):
+    def __init__(self):
+        super().__init__()
+        self.box_crop_x_ratio = 0.5
+        self.box_crop_y_ratio = 6
+
+class rsna_axial_spinal_dis3_crop_x1_y2(rsna_axial_spinal_crop_base):
+    def __init__(self):
+        super().__init__()
+        self.box_crop_x_ratio = 1
+        self.box_crop_y_ratio = 2
+
+# ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# reduce_noise axial (stage 2)
+# version1
+# class rsna_axial_spinal_dis3_crop_x05_y6_reduce_noise(rsna_axial_spinal_dis3_crop_x05_y6):
+#     def __init__(self):
+#         super().__init__()
+#         self.train_df['level'] = self.train_df.pred_level.map({
+#             1: 'l1_l2',
+#             2: 'l2_l3',
+#             3: 'l3_l4',
+#             4: 'l4_l5',
+#             5: 'l5_s1',
+#         })
+#         noise_df = pd.read_csv(f'results/noisy_target_level_1016.csv')
+#         noise_df = noise_df[noise_df.target=='spinal_canal_stenosis']
+#         self.train_df['study_level'] = self.train_df.study_id.astype(str) + '_' + self.train_df.level.apply(lambda x: x.replace('/', '_').lower())
+#         self.train_df = self.train_df[~self.train_df.study_level.isin(noise_df.study_level)]
+
+# version2
+# class rsna_axial_spinal_dis3_crop_x05_y6_reduce_noise(rsna_axial_spinal_dis3_crop_x05_y6):
+#     def __init__(self, fold=0):
+#         super().__init__()
+
+#         self.fold = fold  # 儲存fold參數
+#         self.train_df_path = f'{WORKING_DIR}/csv_train/axial_classification_7/axial_classification.csv'
+#         self.train_df = pd.read_csv(self.train_df_path)
+#         self.train_df['level'] = self.train_df.pred_level.map({
+#             1: 'l1_l2',
+#             2: 'l2_l3',
+#             3: 'l3_l4',
+#             4: 'l4_l5',
+#             5: 'l5_s1',
+#         })
+
+#         # noise_df = pd.read_csv(f'results/noisy_target_level_1016.csv')
+#         noise_df = pd.read_csv(f'{WORKING_DIR}/csv_train/noise_reduction_by_oof_9/noisy_target_level_th09.csv')
+#         noise_df = noise_df[noise_df.target == 'spinal_canal_stenosis']
+#         self.train_df['study_level'] = self.train_df.study_id.astype(str) + '_' + self.train_df.level.str.replace('/', '_').str.lower()
+#         self.train_df = self.train_df[~self.train_df.study_level.isin(noise_df.study_level)]
+
+#         # add image location info
+#         self.train_df['left_right'] = 'center'
+
+#         # assign relevant columns (no renaming necessary)
+#         cols = [
+#             'spinal_canal_stenosis_normal',
+#             'spinal_canal_stenosis_moderate',
+#             'spinal_canal_stenosis_severe',
+#         ]
+        # for c in cols:
+        #     self.train_df[c] = self.train_df[c].values
+
+# version1
+# class rsna_axial_spinal_dis3_crop_x1_y2_reduce_noise(rsna_axial_spinal_dis3_crop_x1_y2):
+#     def __init__(self):
+#         super().__init__()
+#         self.train_df['level'] = self.train_df.pred_level.map({
+#             1: 'l1_l2',
+#             2: 'l2_l3',
+#             3: 'l3_l4',
+#             4: 'l4_l5',
+#             5: 'l5_s1',
+#         })
+#         noise_df = pd.read_csv(f'results/noisy_target_level_1016.csv')
+#         noise_df = noise_df[noise_df.target=='spinal_canal_stenosis']
+#         self.train_df['study_level'] = self.train_df.study_id.astype(str) + '_' + self.train_df.level.apply(lambda x: x.replace('/', '_').lower())
+#         self.train_df = self.train_df[~self.train_df.study_level.isin(noise_df.study_level)]
+
+# version2
+# class rsna_axial_spinal_dis3_crop_x1_y2_reduce_noise(rsna_axial_spinal_dis3_crop_x1_y2):
+#     def __init__(self, fold=0):
+#         super().__init__()
+
+#         self.fold = fold  # 儲存fold參數
+#         self.train_df_path = f'{WORKING_DIR}/csv_train/axial_classification_7/axial_classification.csv'
+#         self.train_df = pd.read_csv(self.train_df_path)
+#         self.train_df['level'] = self.train_df.pred_level.map({
+#             1: 'l1_l2',
+#             2: 'l2_l3',
+#             3: 'l3_l4',
+#             4: 'l4_l5',
+#             5: 'l5_s1',
+#         })
+
+#         # noise_df = pd.read_csv(f'results/noisy_target_level_1016.csv')
+#         noise_df = pd.read_csv(f'{WORKING_DIR}/csv_train/noise_reduction_by_oof_9/noisy_target_level_th09.csv')
+#         noise_df = noise_df[noise_df.target == 'spinal_canal_stenosis']
+#         self.train_df['study_level'] = self.train_df.study_id.astype(str) + '_' + self.train_df.level.str.replace('/', '_').str.lower()
+#         self.train_df = self.train_df[~self.train_df.study_level.isin(noise_df.study_level)]
+
+#         self.train_df['left_right'] = 'center'
+
+#         cols = [
+#             'spinal_canal_stenosis_normal',
+#             'spinal_canal_stenosis_moderate',
+#             'spinal_canal_stenosis_severe',
+#         ]
+        # for c in cols:
+        #     self.train_df[c] = self.train_df[c].values
+
+# ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# reduce_noise axial (stage 2)
+# train(by clean data) vaild(by original data)
+class rsna_axial_spinal_dis3_crop_x05_y6_with_valid(rsna_axial_spinal_dis3_crop_x05_y6):
+    def __init__(self, fold=0):
+        super().__init__()
+
+        self.fold = fold
+        self.train_df_path = f'{WORKING_DIR}/csv_train/axial_classification_7/axial_classification.csv'
+
+        # 讀取原始資料
+        valid_df = pd.read_csv(self.train_df_path)
+        valid_df['level'] = valid_df.pred_level.map({
+            1: 'l1_l2',
+            2: 'l2_l3',
+            3: 'l3_l4',
+            4: 'l4_l5',
+            5: 'l5_s1',
+        })
+        valid_df['study_level'] = valid_df.study_id.astype(str) + '_' + valid_df.level.str.replace('/', '_').str.lower()
+        valid_df['left_right'] = 'center'  # 中央對稱特徵
+
+        self.valid_df = valid_df.copy()  # 保留全部資料給 valid_df
+
+        # 建立 train_df：過濾 noisy 標籤資料
+        noise_df = pd.read_csv(f'{WORKING_DIR}/csv_train/noise_reduction_by_oof_9/noisy_target_level_th09.csv')
+        noise_df = noise_df[noise_df.target == 'spinal_canal_stenosis']
+        noisy_study_levels = set(noise_df.study_level)
+
+        self.train_df = valid_df[~valid_df.study_level.isin(noisy_study_levels)].reset_index(drop=True)
+
+        # 指定分類欄位（這裡無需重新命名）
+        cols = [
+            'spinal_canal_stenosis_normal',
+            'spinal_canal_stenosis_moderate',
+            'spinal_canal_stenosis_severe',
+        ]
+
+class rsna_axial_spinal_dis3_crop_x1_y2_with_valid(rsna_axial_spinal_dis3_crop_x1_y2):
+    def __init__(self, fold=0):
+        super().__init__()
+
+        self.fold = fold
+        self.train_df_path = f'{WORKING_DIR}/csv_train/axial_classification_7/axial_classification.csv'
+
+        # 讀取完整資料
+        valid_df = pd.read_csv(self.train_df_path)
+        valid_df['level'] = valid_df.pred_level.map({
+            1: 'l1_l2',
+            2: 'l2_l3',
+            3: 'l3_l4',
+            4: 'l4_l5',
+            5: 'l5_s1',
+        })
+        valid_df['study_level'] = valid_df.study_id.astype(str) + '_' + valid_df.level.str.replace('/', '_').str.lower()
+        valid_df['left_right'] = 'center'
+
+        # 保留全部資料給 valid_df
+        self.valid_df = valid_df.copy()
+
+        # 載入 noisy 標記，並過濾 train_df
+        noise_df = pd.read_csv(f'{WORKING_DIR}/csv_train/noise_reduction_by_oof_9/noisy_target_level_th09.csv')
+        noise_df = noise_df[noise_df.target == 'spinal_canal_stenosis']
+        noisy_study_levels = set(noise_df.study_level)
+
+        self.train_df = valid_df[~valid_df.study_level.isin(noisy_study_levels)].reset_index(drop=True)
+
+        # 指定欄位（實際用途可能在 downstream 過程）
+        self.cols = [
+            'spinal_canal_stenosis_normal',
+            'spinal_canal_stenosis_moderate',
+            'spinal_canal_stenosis_severe',
+        ]
+
+
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 class rsna_v1(Baseline):
