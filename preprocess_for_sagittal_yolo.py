@@ -70,6 +70,14 @@ targets = ['l1_spinal', 'l2_spinal', 'l3_spinal', 'l4_spinal', 'l5_spinal', 'l1_
 targets = [f'pred_{c}' for c in targets]  # pred_l1_spinal (沒有做 sigmoid)
 pred_cols = [f'pred_{c}' for c in targets]  # pred_pred_l1_spinal (有做 sigmoid)
 
+# 我加
+train = pd.concat([pd.read_csv(f'{WORKING_DIR}/ckpt/rsna_sagittal_cl/train_fold1.csv') for fold in range(1)])  # 在 slice estimation 最後得到各個類別的分數
+train[pred_cols] = sigmoid(train[pred_cols])
+train['pred_spinal'] = train[[c for c in pred_cols if 'spinal' in c]].mean(1)  # 用有做 sigmoid 的結果去平均
+train['pred_right_neural'] = train[[c for c in pred_cols if 'right_neural' in c]].mean(1)
+train['pred_left_neural'] = train[[c for c in pred_cols if 'left_neural' in c]].mean(1)
+train.to_csv('sagittal_train.csv', index=False)
+
 # oof = pd.concat([pd.read_csv(f'results/rsna_sagittal_cl/oof_fold{fold}.csv') for fold in range(5)])
 # oof = pd.concat([pd.read_csv(f'{WORKING_DIR}/ckpt/rsna_sagittal_cl/oof_fold{fold}.csv') for fold in range(1)])  # 在 slice estimation 最後得到各個類別的分數
 oof = pd.concat([pd.read_csv(f'{WORKING_DIR}/ckpt/rsna_sagittal_cl/oof_fold1.csv') for fold in range(1)])  # 在 slice estimation 最後得到各個類別的分數
@@ -82,8 +90,8 @@ oof['pred_left_neural'] = oof[[c for c in pred_cols if 'left_neural' in c]].mean
 oof.to_csv('sagittal_oof.csv', index=False)
 # print('preprocess_for_sagittal_yolo.py finish')
 
+# 我加
 test = pd.concat([pd.read_csv(f'{WORKING_DIR}/ckpt/rsna_sagittal_cl/test_fold1.csv') for fold in range(1)])  # 在 slice estimation 最後得到各個類別的分數
-
 test[pred_cols] = sigmoid(test[pred_cols])
 test['pred_spinal'] = test[[c for c in pred_cols if 'spinal' in c]].mean(1)  # 用有做 sigmoid 的結果去平均
 test['pred_right_neural'] = test[[c for c in pred_cols if 'right_neural' in c]].mean(1)
