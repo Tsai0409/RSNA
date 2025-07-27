@@ -73,7 +73,7 @@ dfs = []
 # df_path = 'results/rsna_sagittal_cl/oof.csv'
 # df_path = f'{WORKING_DIR}/ckpt/rsna_sagittal_cl/oof.csv'  # slice estimation 的結果 region_estimation_by_yolox_6/oof.csv
 # df_path = f'{WORKING_DIR}/csv_train/region_estimation_by_yolox_holdout_6/sagittal_oof.csv'  # slice estimation 的結果 region_estimation_by_yolox_holdout_6/sagittal_oof.csv (preprocess_for_sagittal_yolo.py 產生)
-df_path = f'{WORKING_DIR}/csv_train/region_estimation_by_yolox_holdout_6/sagittal_oof_clear.csv'  # 去除掉 groundture
+df_path = f'{WORKING_DIR}/csv_train/region_estimation_by_yolox_holdout_6/sagittal_train_clear.csv'  # 去除掉 groundture
 df = pd.read_csv(df_path)
 # df['path'] = f'input/sagittal_all_images/' + df.study_id.astype(str) + '___' + df.instance_number.astype(str) + '.png'
 df['path'] = f'/kaggle/temp/sagittal_all_images/' + df.study_id.astype(str) + '___' + df.instance_number.astype(str) + '.png'  # 將原本 study_id___series_id___instance_number -> series_id___instance_number
@@ -189,7 +189,7 @@ for left_right in ['left', 'right']:
     # df_path = 'results/rsna_sagittal_cl/oof.csv'
     # df_path = f'{WORKING_DIR}/ckpt/rsna_sagittal_cl/oof.csv'  # slice estimation 的結果 region_estimation_by_yolox_6/oof.csv
     # df_path = f'{WORKING_DIR}/csv_train/region_estimation_by_yolox_holdout_6/sagittal_oof.csv'  # slice estimation 的結果 region_estimation_by_yolox_holdout_6/sagittal_oof.csv (preprocess_for_sagittal_yolo.py 產生)
-    df_path = f'{WORKING_DIR}/csv_train/region_estimation_by_yolox_holdout_6/sagittal_oof_clear.csv'  # 去除掉 groundture
+    df_path = f'{WORKING_DIR}/csv_train/region_estimation_by_yolox_holdout_6/sagittal_train_clear.csv'  # 去除掉 groundture
     df = pd.read_csv(df_path)
     # sdf = pd.read_csv('input/train_series_descriptions.csv')
     sdf = pd.read_csv(f'{WORKING_DIR}/kaggle_csv/train_series_descriptions.csv')
@@ -294,7 +294,7 @@ for left_right in ['left', 'right']:
     # df_path = 'results/rsna_sagittal_cl/oof.csv'
     # df_path = f'{WORKING_DIR}/ckpt/rsna_sagittal_cl/oof.csv'
     # df_path = f'{WORKING_DIR}/csv_train/region_estimation_by_yolox_holdout_6/sagittal_oof.csv'  # slice estimation 的結果 region_estimation_by_yolox_holdout_6/sagittal_oof.csv (preprocess_for_sagittal_yolo.py 產生)
-    df_path = f'{WORKING_DIR}/csv_train/region_estimation_by_yolox_holdout_6/sagittal_oof_clear.csv'  # 去除掉 groundture
+    df_path = f'{WORKING_DIR}/csv_train/region_estimation_by_yolox_holdout_6/sagittal_train_clear.csv'  # 去除掉 groundture
     df = pd.read_csv(df_path)
     # sdf = pd.read_csv('input/train_series_descriptions.csv')
     sdf = pd.read_csv(f'{WORKING_DIR}/kaggle_csv/train_series_descriptions.csv')
