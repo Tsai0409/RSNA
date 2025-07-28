@@ -11,7 +11,7 @@ from tqdm.notebook import tqdm
 tqdm.pandas()
 from sklearn.model_selection import GroupKFold
 import sys
-from src.yolo_configs import *
+from src_new.yolo_configs import *
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):

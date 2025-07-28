@@ -42,7 +42,7 @@ if __name__ == "__main__":
     print(f"Starting training for config: {args.config}, fold: {args.fold}")  # 我加
 
     if args.type == 'classification':  # args.type 如果沒有定義 default='classification'
-        from src.configs import *  # cfg 參數的初始定義是從 configs.py 的 class Baseline 來的
+        from src_new.configs import *  # cfg 參數的初始定義是從 configs.py 的 class Baseline 來的
     elif args.type == 'seg':
         from src.seg_configs import *
     elif args.type == 'effdet':

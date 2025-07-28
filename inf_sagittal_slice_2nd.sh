@@ -14,10 +14,10 @@ configs=("rsna_sagittal_cl")
 folds=(1)
 
 # 確保需要的腳本存在
-if [[ ! -f $PREPROCESS_SCRIPT || ! -f $TRAIN_SCRIPT || ! -f $PREDICT_SCRIPT ]]; then
-    echo "Error: Missing required scripts in $WORKING_DIR"
-    exit 1
-fi
+# if [[ ! -f $PREPROCESS_SCRIPT || ! -f $TRAIN_SCRIPT || ! -f $PREDICT_SCRIPT ]]; then
+#     echo "Error: Missing required scripts in $WORKING_DIR"
+#     exit 1
+# fi
 
 # 執行預處理
 # cmd="python $PREPROCESS_SCRIPT"

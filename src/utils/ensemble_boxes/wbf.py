@@ -15,7 +15,7 @@ args = parser.parse_args()
 
 configs = args.configs
 
-from src.yolo_configs import *
+from src_new.yolo_configs import *
 cfg = eval(configs[0])()
 
 tests = []
