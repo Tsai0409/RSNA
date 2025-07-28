@@ -65,6 +65,42 @@ box_df['level'] = box_df.class_name.apply(lambda x: x.split('_')[0])
 box_df['lr'] = box_df.class_name.apply(lambda x: x.split('_')[1])
 box_df.to_csv('/kaggle/working/box_df.csv')  # 我加
 
+
+# 針對 train 的資料
+train_path = f'{WORKING_DIR}/results/{config}/train_fold1.csv'
+train_df = pd.read_csv(train_path)
+
+# ===== 篩選 Sagittal 資料 =====
+train_df = train_df[train_df['series_description_y'].isin(['Sagittal T2/STIR', 'Sagittal T1'])]
+
+# ===== 建立必要欄位：study_id, series_id, class_id, class_name, box =====
+box_cols = ['x_min', 'y_min', 'x_max', 'y_max']
+required_cols = ['study_id', 'series_id', 'class_id', 'class_name'] + box_cols
+train_box_df = train_df[required_cols].copy()
+
+# ===== 加入 level 與 lr 欄位 =====
+train_box_df['level'] = train_box_df['class_name'].apply(lambda x: x.split('_')[0])
+train_box_df['lr'] = train_box_df['class_name'].apply(lambda x: x.split('_')[1])
+
+# ===== 驗證每個 study 是否都有 10 個 class（錯的就收集起來）=====
+error_dfs = []
+for id, idf in train_box_df.groupby('study_id'):
+    if len(idf) != 10:
+        error_dfs.append(idf)
+    assert len(idf) <= 10
+
+# ===== 儲存異常資料 =====
+if error_dfs:
+    error_df = pd.concat(error_dfs)
+    error_df.to_csv(f'{WORKING_DIR}/train_error.csv', index=False)
+    print(f"⚠️ 已儲存異常資料到 train_error.csv（共 {error_df.study_id.nunique()} 個 study）")
+
+# ===== 儲存結果 =====
+train_box_df.to_csv(f'{WORKING_DIR}/box_df_train.csv', index=False)
+
+
+
+
 rolling = 5
 range_n = 2
 
@@ -73,7 +109,7 @@ dfs = []
 # df_path = 'results/rsna_sagittal_cl/oof.csv'
 # df_path = f'{WORKING_DIR}/ckpt/rsna_sagittal_cl/oof.csv'  # slice estimation 的結果 region_estimation_by_yolox_6/oof.csv
 # df_path = f'{WORKING_DIR}/csv_train/region_estimation_by_yolox_holdout_6/sagittal_oof.csv'  # slice estimation 的結果 region_estimation_by_yolox_holdout_6/sagittal_oof.csv (preprocess_for_sagittal_yolo.py 產生)
-df_path = f'{WORKING_DIR}/csv_train/region_estimation_by_yolox_holdout_6/sagittal_train_clear_filtered.csv'  # 去除掉 groundture
+df_path = f'{WORKING_DIR}/csv_train/region_estimation_by_yolox_holdout_6/sagittal_train_clear_filtered.csv'  # 去除掉 groundture -> train valid
 df = pd.read_csv(df_path)
 # df['path'] = f'input/sagittal_all_images/' + df.study_id.astype(str) + '___' + df.instance_number.astype(str) + '.png'
 df['path'] = f'/kaggle/temp/sagittal_all_images/' + df.study_id.astype(str) + '___' + df.instance_number.astype(str) + '.png'  # 將原本 study_id___series_id___instance_number -> series_id___instance_number
@@ -99,7 +135,7 @@ for id, idf in df.groupby('series_id'):
     dfs.append(ldf)
 df = pd.concat(dfs)
 df = df.drop_duplicates('study_id')
-df.to_csv('/kaggle/working/df1.csv')  # 我加
+df.to_csv('/kaggle/working/df1.csv')  # 我加 -> train valid
 
 df = df.merge(box_df, on=['study_id'])
 dfs = []
@@ -115,7 +151,7 @@ for i, idf in df.groupby(['study_id', 'level']):
     idf = idf.iloc[:1]
     dfs.append(idf)
 df = pd.concat(dfs)
-df.to_csv('/kaggle/working/df2.csv')  # 我加
+df.to_csv('/kaggle/working/df2.csv')  # 我加 -> valid
 
 # tr = pd.read_csv('input/train.csv')
 tr = pd.read_csv(f'{WORKING_DIR}/kaggle_csv/train.csv')

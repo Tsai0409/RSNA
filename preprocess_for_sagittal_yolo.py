@@ -100,4 +100,4 @@ test.to_csv('sagittal_test.csv', index=False)
 print('preprocess_for_sagittal_yolo.py finish')
 
 # train_for_yolo_10level_v1.csv 找出 bounding box 的位置
-# test.csv 找出 每個類別的各自的分數(包含是哪個 slice 的資訊)
+# test.csv 找出 每個類別的各自的分數(包含是哪個 slice 的資訊) -> 做兩件事：1.做sigmoid 2.增加pred_spinal、pred_right_neural、pred_left_neural

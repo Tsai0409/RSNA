@@ -176,7 +176,8 @@ class rsna_10classes_yolox_x(Baseline):
         #     ldf = idf[idf['pred_spinal']==idf['pred_spinal'].max()].iloc[:1]
         #     dfs.append(ldf)
         # self.test_df = pd.concat(dfs)
-        test = pd.read_csv(f'{WORKING_DIR}/csv_train/region_estimation_by_yolox_holdout_6/sagittal_test.csv')
+        # test = pd.read_csv(f'{WORKING_DIR}/csv_train/region_estimation_by_yolox_holdout_6/sagittal_test.csv')  # -> test
+        test = pd.read_csv(f'{WORKING_DIR}/csv_train/region_estimation_by_yolox_holdout_6/sagittal_train_clear_filtered.csv')  # -> train
         dfs = []
         for id, idf in test.groupby('series_id'):
             idf = idf.sort_values(['x_pos', 'instance_number'])
