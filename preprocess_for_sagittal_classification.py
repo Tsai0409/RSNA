@@ -82,18 +82,6 @@ for id, idf in df.groupby('series_id'):
     idf = idf.drop_duplicates('x_pos')
     idf[f'pred_spinal_rolling'] = idf[f'pred_spinal'].rolling(rolling, center=True).mean()  # rolling=5 -> 以目前 slice 為中心取前後各 2 張做平均
 
-    if col not in idf.columns:
-        raise ValueError(f"欄位 {col} 不存在於 dataframe 中")
-
-    if idf[col].isnull().all():
-        raise ValueError(f"欄位 {col} 全部為 NaN，無法取最大值")
-
-    try:
-        idx = idf[col].idxmax()
-        n = idf.loc[idx, 'instance_number']
-    except KeyError:
-        raise KeyError("instance_number 欄位不存在")
-
     path_fit_xy = idf[idf['pred_spinal']==idf['pred_spinal'].max()].path.values[0]  # 找出原始分數最高的那張影像作為「代表影像」的路徑
     
     col = 'pred_spinal_rolling'
