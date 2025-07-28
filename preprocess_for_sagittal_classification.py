@@ -83,8 +83,8 @@ for id, idf in df.groupby('series_id'):
     idf[f'pred_spinal_rolling'] = idf[f'pred_spinal'].rolling(rolling, center=True).mean()  # rolling=5 -> 以目前 slice 為中心取前後各 2 張做平均
 
     path_fit_xy = idf[idf['pred_spinal']==idf['pred_spinal'].max()].path.values[0]  # 找出原始分數最高的那張影像作為「代表影像」的路徑
-    path_fit_xy.to_csv('/kaggle/working/path_fit_xy.csv')  # 我加
-    
+    idf.to_csv('/kaggle/working/path_fit_xy.csv')  # 我加
+
     col = 'pred_spinal_rolling'
     n = idf[idf[col]==idf[col].max()].instance_number.values[0]  # 使用 pred_spinal 的最大值作為中心點；找出原始分數最高的那張影像作為「代表影像」的 instance_number
 
