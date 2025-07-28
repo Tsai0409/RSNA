@@ -21,10 +21,8 @@ WORKING_DIR="/kaggle/working/duplicate"
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("--configs", '-c', nargs='+', type=str, default=['test'])
-# parser.add_argument("--configs", '-c', nargs='+', type=str, default=['rsna_axial_all_images_left_yolox_x'])
 # parser.add_argument('--fold', '-f', nargs='+', type=int, default=[0,1,2,3,4])
 parser.add_argument('--fold', '-f', nargs='+', type=int, default=[1])  # for rsna_10classes_yolox_x
-# parser.add_argument('--fold', '-f', nargs='+', type=int, default=[0])  # for rsna_axial_all_images_left_yolox_x\rsna_axial_all_images_right_yolox_x
 args = parser.parse_args()
 
 configs = args.configs
