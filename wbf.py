@@ -48,6 +48,7 @@ for model_n, config in enumerate(configs):
         # test = pd.read_csv(f'results/{config}/test_fold{fold}.csv')
         test = pd.read_csv(f'{WORKING_DIR}/results/{config}/test_fold{fold}.csv')  # rsna_axial_all_images_left_yolox_x/test_fold0.csv (sagittal region estimation)
         print('configs = ', config)  # 我加
+        print('fold = ', fold)  # 我加
         test['model_n'] = f'{model_n}_fold{fold}'  # model_n 將不同模型/fold 預測框融合在一起
         tests.append(test)
 test = pd.concat(tests)
