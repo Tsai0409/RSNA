@@ -195,6 +195,7 @@ for left_right in ['left', 'right']:
     # sdf = pd.read_csv('input/train_series_descriptions.csv')
     sdf = pd.read_csv(f'{WORKING_DIR}/kaggle_csv/train_series_descriptions.csv')
     df = df.merge(sdf, on=['study_id', 'series_id'])
+    df.to_csv('df_combine.csv', index=False)
     df = df[df.series_description!='Sagittal T1']  # 留下 Sagittal T2/STIR(spinal)
     # df['path'] = f'input/sagittal_all_images/' + df.study_id.astype(str) + '___' + df.instance_number.astype(str) + '.png'
     df['path'] = f'/kaggle/temp/sagittal_all_images/' + df.study_id.astype(str) + '___' + df.instance_number.astype(str) + '.png'
