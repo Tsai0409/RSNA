@@ -27,7 +27,7 @@ args = parser.parse_args()
 
 configs = args.configs
 
-from src_new.yolo_configs import *
+from src.yolo_configs import *
 cfg = eval(configs[0])()  # configs = {rsna_axial_all_images_left_yolox_x}
 # 假設你有一個字典或模塊，其中包含所有類
 # class_map = {
