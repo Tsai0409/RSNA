@@ -41,7 +41,7 @@ tr.to_csv('tr.csv')  # 我加
 # axial right
 # test = pd.read_csv('results/rsna_axial_all_images_right_yolox_x/test_fold0.csv')
 # test = pd.read_csv(f'{WORKING_DIR}/results/rsna_axial_all_images_right_yolox_x/test_fold1.csv')  # -> test(holdout)
-test = pd.read_csv(f'{WORKING_DIR}/results/rsna_axial_all_images_right_yolox_x/train_fold1.csv')  # -> train(holdout)
+test = pd.read_csv(f'{WORKING_DIR}/results/rsna_axial_all_images_right_yolox_x/train_fold1.csv')  # -> train(holdout) only Axial T2
 dfs=[]
 for p, pdf in tqdm(test.groupby(["path", 'class_id'])):  # class_id = 0(right)
     dfs.append(pdf[pdf.conf==pdf.conf.max()])
