@@ -52,7 +52,7 @@ for c in ['conf', 'x_min', 'y_min', 'x_max', 'y_max']:
 # axial left
 # test = pd.read_csv('results/rsna_axial_all_images_left_yolox_x/test_fold0.csv')
 # test = pd.read_csv(f'{WORKING_DIR}/results/rsna_axial_all_images_left_yolox_x/test_fold1.csv')  # -> test(holdout)
-test = pd.read_csv(f'{WORKING_DIR}/results/rsna_axial_all_images_right_yolox_x/train_fold1.csv')  # -> train(holdout)
+test = pd.read_csv(f'{WORKING_DIR}/results/rsna_axial_all_images_left_yolox_x/train_fold1.csv')  # -> train(holdout)
 dfs=[]
 for p, pdf in tqdm(test.groupby(["path", 'class_id'])):  # class_id = 0(left)
     dfs.append(pdf[pdf.conf==pdf.conf.max()])

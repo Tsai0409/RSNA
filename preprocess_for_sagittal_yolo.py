@@ -66,13 +66,16 @@ df = df[df.series_description_y == "Sagittal T2/STIR"]  # NFN
 # df.to_csv('input/train_for_yolo_10level_v1.csv', index=False)
 df.to_csv('train_for_yolo_10level_v1.csv', index=False)
 
+
+
+
 targets = ['l1_spinal', 'l2_spinal', 'l3_spinal', 'l4_spinal', 'l5_spinal', 'l1_right_neural', 'l2_right_neural', 'l3_right_neural', 'l4_right_neural', 'l5_right_neural', 'l1_left_neural', 'l2_left_neural', 'l3_left_neural', 'l4_left_neural', 'l5_left_neural']
 targets = [f'pred_{c}' for c in targets]  # pred_l1_spinal (沒有做 sigmoid)
 pred_cols = [f'pred_{c}' for c in targets]  # pred_pred_l1_spinal (有做 sigmoid)
 
 # 我加
 train = pd.concat([pd.read_csv(f'{WORKING_DIR}/ckpt/rsna_sagittal_cl/train_fold1.csv') for fold in range(1)])  # 在 slice estimation 最後得到各個類別的分數
-train[pred_cols] = sigmoid(train[pred_cols])
+train[pred_cols] = sigmoid(train[pred_cols])  # 將 pred_pred_ 做 sigmoid
 train['pred_spinal'] = train[[c for c in pred_cols if 'spinal' in c]].mean(1)  # 用有做 sigmoid 的結果去平均
 train['pred_right_neural'] = train[[c for c in pred_cols if 'right_neural' in c]].mean(1)
 train['pred_left_neural'] = train[[c for c in pred_cols if 'left_neural' in c]].mean(1)
