@@ -35,7 +35,7 @@ if __name__ == "__main__":
     args = parse_args()
 
     if args.type == 'classification':  # default='classification'
-        from src_new.configs import *
+        from src.configs import *
     elif args.type == 'effdet':
         from src.effdet_configs import *
     elif args.type == 'seg':
