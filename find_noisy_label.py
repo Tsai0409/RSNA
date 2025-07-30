@@ -517,6 +517,74 @@ for c in cols:
     oof.loc[oof[c].isnull(), 'sagittal_pred_'+c] = np.nan
 oof.to_csv('oof5.csv')  # 我加 -> 75 個實際 label + 150 預測 label(axial、sagittal)
 
+'''
+import numpy as np
+import pandas as pd
+from sklearn.metrics import confusion_matrix, classification_report
+
+# 載入你的 oof 結果（如果已經載入就不用這行）
+oof = pd.read_csv('oof5.csv')  # 這裡路徑依你自己的為主
+
+# 定義 25 個條件（label_features）
+label_features = [
+    'spinal_canal_stenosis_l1_l2', 'spinal_canal_stenosis_l2_l3', 'spinal_canal_stenosis_l3_l4', 'spinal_canal_stenosis_l4_l5', 'spinal_canal_stenosis_l5_s1',
+    'left_neural_foraminal_narrowing_l1_l2', 'left_neural_foraminal_narrowing_l2_l3', 'left_neural_foraminal_narrowing_l3_l4', 'left_neural_foraminal_narrowing_l4_l5', 'left_neural_foraminal_narrowing_l5_s1',
+    'right_neural_foraminal_narrowing_l1_l2', 'right_neural_foraminal_narrowing_l2_l3', 'right_neural_foraminal_narrowing_l3_l4', 'right_neural_foraminal_narrowing_l4_l5', 'right_neural_foraminal_narrowing_l5_s1',
+    'left_subarticular_stenosis_l1_l2', 'left_subarticular_stenosis_l2_l3', 'left_subarticular_stenosis_l3_l4', 'left_subarticular_stenosis_l4_l5', 'left_subarticular_stenosis_l5_s1',
+    'right_subarticular_stenosis_l1_l2', 'right_subarticular_stenosis_l2_l3', 'right_subarticular_stenosis_l3_l4', 'right_subarticular_stenosis_l4_l5', 'right_subarticular_stenosis_l5_s1'
+]
+
+true_labels = []
+pred_labels = []
+
+for feat in label_features:
+    # 取 true one-hot
+    y_true_onehot = oof[[f'{feat}_normal', f'{feat}_moderate', f'{feat}_severe']].values
+    # 取 pred 機率
+    y_pred_proba = oof[[f'pred_{feat}_normal', f'pred_{feat}_moderate', f'pred_{feat}_severe']].values
+
+    # nan 跳過（未標註的資料）
+    mask = ~np.isnan(y_true_onehot).any(axis=1)
+    y_true_onehot = y_true_onehot[mask]
+    y_pred_proba = y_pred_proba[mask]
+    if len(y_true_onehot) == 0:
+        continue
+
+    # one-hot 轉 index (0: normal, 1: moderate, 2: severe)
+    y_true = np.argmax(y_true_onehot, axis=1)
+    y_pred = np.argmax(y_pred_proba, axis=1)
+    true_labels.append(y_true)
+    pred_labels.append(y_pred)
+
+
+from sklearn.metrics import confusion_matrix, classification_report
+
+# 全部合併成 1D
+true_labels = np.concatenate(true_labels)
+pred_labels = np.concatenate(pred_labels)
+
+# confusion matrix
+cm = confusion_matrix(true_labels, pred_labels, labels=[0, 1, 2])
+print('Confusion Matrix (全部 label_features 攤平成一份):')
+print(cm)
+print('\n[0] normal, [1] moderate, [2] severe\n')
+
+# 詳細分類報告
+print(classification_report(true_labels, pred_labels, target_names=['normal', 'moderate', 'severe']))
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+plt.figure(figsize=(6,5))
+sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", 
+            xticklabels=['normal', 'moderate', 'severe'],
+            yticklabels=['normal', 'moderate', 'severe'])
+plt.xlabel("Predicted Label")
+plt.ylabel("True Label")
+plt.title("Confusion Matrix Heatmap (All labels)")
+plt.tight_layout()
+plt.show()
+'''
 
 import torch
 import torch.nn as nn
@@ -745,7 +813,177 @@ for c in [c.replace('pred_', '') for c in pred_cols]:   # pred_cols = 75 個 各
 # oof[['study_id']+pred_cols+[c.replace('pred_', '')+'_loss' for c in pred_cols]].to_csv('results/oof_ensemble.csv', index=False)
 oof[['study_id']+pred_cols+[c.replace('pred_', '')+'_loss' for c in pred_cols]].to_csv(f'{WORKING_DIR}/csv_train/noise_reduction_by_oof_9/oof_ensemble.csv', index=False)  # pred_cols(共 75 欄)、xxx_loss(也是 75 欄)
 oof[['study_id']+pred_cols+[c.replace('pred_', '')+'_loss' for c in pred_cols]]
+oof.to_csv('oof6.csv')  # 我加 
 
+
+# ⑤-②  用 confusion matrix 的方式
+import numpy as np
+import pandas as pd
+
+# pred_cols = 你的預測欄位（應為 75 個，以 pred_ 開頭）
+# 比如：
+# pred_cols = [c for c in oof.columns if c.startswith('pred_') and c.endswith(('normal','moderate','severe'))]
+
+noisy_rows = []
+for i in range(0, len(pred_cols), 3):
+    pred_col_group = pred_cols[i:i+3]  # pred_cols = 75 個 各個病狀的嚴重程度
+    true_col_group = [c.replace('pred_', '') for c in pred_col_group]
+
+    # 防呆：若真實欄位不存在就跳過
+    if not all([c in oof.columns for c in true_col_group]):
+        print(f"缺少真實標籤欄位：{true_col_group}")
+        continue
+
+    pred_prob = oof[pred_col_group].values  # 機率預測
+    true_onehot = oof[true_col_group].values.astype(int)  # one-hot 標籤
+
+    pred_label = np.argmax(pred_prob, axis=1)
+    true_label = np.argmax(true_onehot, axis=1)
+    is_noisy = pred_label != true_label
+    noisy_idx = np.where(is_noisy)[0]
+
+    # 找出疾病名/level
+    base_col = pred_col_group[0].replace('pred_', '').replace('_normal', '')
+    level = base_col.split('_')[-2] + '_' + base_col.split('_')[-1]
+    target = '_'.join(base_col.split('_')[:-2])
+
+    for idx in noisy_idx:
+        study_id = oof.iloc[idx]['study_id']
+        noisy_rows.append({
+            'study_id': study_id,
+            'target': target,
+            'level': level,
+            'row_idx': idx,
+        })
+
+noise_df = pd.DataFrame(noisy_rows)
+noise_df['study_level'] = noise_df['study_id'].astype(str) + '_' + noise_df['level']
+noise_df = noise_df.sort_values(['target', 'study_id', 'level'])
+noise_df.to_csv(f'{WORKING_DIR}/csv_train/noise_reduction_by_oof_9/noisy_target_level_confusion.csv', index=False)
+
+import numpy as np
+import pandas as pd
+from collections import defaultdict
+
+# 記得 pred_cols 必須是有順序的一組一組，每3欄一個 group
+# 這裡直接先產生所有類別的統計
+result = defaultdict(lambda: defaultdict(int))  # result[group][class] = [TP,TN,FP,FN]
+
+for i in range(0, len(pred_cols), 3):
+    pred_col_group = pred_cols[i:i+3]
+    true_col_group = [c.replace('pred_', '') for c in pred_col_group]
+
+    base_col = pred_col_group[0].replace('pred_', '').replace('_normal', '')
+    class_names = ['normal', 'moderate', 'severe']
+
+    pred_prob = oof[pred_col_group].values
+    true_onehot = oof[true_col_group].values.astype(int)
+    pred_label = np.argmax(pred_prob, axis=1)
+    true_label = np.argmax(true_onehot, axis=1)
+
+    for class_idx, class_name in enumerate(class_names):
+        # binary: 以 class_idx 為正類，其他為負
+        pred_bin = (pred_label == class_idx)
+        true_bin = (true_label == class_idx)
+        TP = np.logical_and(pred_bin, true_bin).sum()
+        TN = np.logical_and(~pred_bin, ~true_bin).sum()
+        FP = np.logical_and(pred_bin, ~true_bin).sum()
+        FN = np.logical_and(~pred_bin, true_bin).sum()
+        result[base_col+'_'+class_name]['TP'] += TP
+        result[base_col+'_'+class_name]['TN'] += TN
+        result[base_col+'_'+class_name]['FP'] += FP
+        result[base_col+'_'+class_name]['FN'] += FN
+
+# 最後統計出來（以全部的 sum 為例，也可細分 group）
+TP = sum(v['TP'] for v in result.values())
+TN = sum(v['TN'] for v in result.values())
+FP = sum(v['FP'] for v in result.values())
+FN = sum(v['FN'] for v in result.values())
+
+print(f"TP: {TP}  TN: {TN}  FP: {FP}  FN: {FN}")
+
+# 如果想看單一 group 下某一類別的 TP/TN/FP/FN：
+# print(result['spinal_canal_stenosis_l1_l2_normal'])
+
+# ⑤-③  用 confusion matrix heatmap 的方式
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.metrics import confusion_matrix, classification_report
+
+# 1. 載入 oof6.csv
+oof = pd.read_csv('oof6.csv')
+
+# 2. 定義 label_features
+label_features = [
+    'spinal_canal_stenosis_l1_l2', 'spinal_canal_stenosis_l2_l3', 'spinal_canal_stenosis_l3_l4', 'spinal_canal_stenosis_l4_l5', 'spinal_canal_stenosis_l5_s1',
+    'left_neural_foraminal_narrowing_l1_l2', 'left_neural_foraminal_narrowing_l2_l3', 'left_neural_foraminal_narrowing_l3_l4', 'left_neural_foraminal_narrowing_l4_l5', 'left_neural_foraminal_narrowing_l5_s1',
+    'right_neural_foraminal_narrowing_l1_l2', 'right_neural_foraminal_narrowing_l2_l3', 'right_neural_foraminal_narrowing_l3_l4', 'right_neural_foraminal_narrowing_l4_l5', 'right_neural_foraminal_narrowing_l5_s1',
+    'left_subarticular_stenosis_l1_l2', 'left_subarticular_stenosis_l2_l3', 'left_subarticular_stenosis_l3_l4', 'left_subarticular_stenosis_l4_l5', 'left_subarticular_stenosis_l5_s1',
+    'right_subarticular_stenosis_l1_l2', 'right_subarticular_stenosis_l2_l3', 'right_subarticular_stenosis_l3_l4', 'right_subarticular_stenosis_l4_l5', 'right_subarticular_stenosis_l5_s1'
+]
+
+true_labels = []
+pred_labels = []
+
+for feat in label_features:
+    # 取 true one-hot
+    y_true_onehot = oof[[f'{feat}_normal', f'{feat}_moderate', f'{feat}_severe']].values
+    # 取你合併後的預測
+    y_pred_proba = oof[[f'pred_{feat}_normal', f'pred_{feat}_moderate', f'pred_{feat}_severe']].values
+
+    # nan 跳過
+    mask = ~np.isnan(y_true_onehot).any(axis=1)
+    y_true_onehot = y_true_onehot[mask]
+    y_pred_proba = y_pred_proba[mask]
+    if len(y_true_onehot) == 0:
+        continue
+
+    y_true = np.argmax(y_true_onehot, axis=1)
+    y_pred = np.argmax(y_pred_proba, axis=1)
+    true_labels.append(y_true)
+    pred_labels.append(y_pred)
+
+# 3. 合併成 1D
+true_labels = np.concatenate(true_labels)
+pred_labels = np.concatenate(pred_labels)
+
+# 4. 畫 confusion matrix 與 heatmap
+cm = confusion_matrix(true_labels, pred_labels, labels=[0, 1, 2])
+print('Confusion Matrix (合併後):')
+print(cm)
+print('\n[0] normal, [1] moderate, [2] severe\n')
+print(classification_report(true_labels, pred_labels, target_names=['normal', 'moderate', 'severe']))
+
+# plt.figure(figsize=(6,5))
+# sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
+#             xticklabels=['normal', 'moderate', 'severe'],
+#             yticklabels=['normal', 'moderate', 'severe'])
+# plt.xlabel("Predicted Label")
+# plt.ylabel("True Label")
+# plt.title("Confusion Matrix Heatmap (融合預測結果)")
+# plt.tight_layout()
+# plt.show()
+# plt.savefig("heatmap.png")
+
+plt.figure(figsize=(6,5))
+ax = sns.heatmap(
+    cm,
+    annot=True,
+    fmt="d",
+    cmap="Blues",
+    xticklabels=['normal', 'moderate', 'severe'],
+    yticklabels=['normal', 'moderate', 'severe']
+)
+ax.set_xlabel("Predict", fontsize=12)
+ax.xaxis.set_label_position('top')   # 把 x 軸標籤放到上面
+ax.xaxis.tick_top()                  # 把 x 軸 tick 也移到上面
+plt.ylabel("Ground Truth", fontsize=12)
+plt.title("Confusion Matrix Heatmap", fontsize=14, pad=20)
+plt.tight_layout()
+plt.show()
+plt.savefig("heatmap.png")
 
 # ⑤ 輸出含有 noisy 預測的樣本（th=0.8）
 th = 0.8
