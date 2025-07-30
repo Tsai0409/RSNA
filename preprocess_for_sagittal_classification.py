@@ -15,6 +15,7 @@ WORKING_DIR="/kaggle/working/duplicate"
 # oof -> 合併 /results/rsna_10classes_yolox_x/oof_fold0.csv、/results/rsna_10classes_yolox_x/oof_fold1.csv 有 fold0-1 的資訊
 # test -> wbf 沒有 fold 資訊
 
+'''
 config = 'rsna_10classes_yolox_x'
 box_cols = ['x_min', 'y_min', 'x_max', 'y_max']
 # tr = pd.read_csv('input/train_with_fold.csv')
@@ -64,40 +65,50 @@ for id, idf in box_df.groupby('study_id'):
 box_df['level'] = box_df.class_name.apply(lambda x: x.split('_')[0])
 box_df['lr'] = box_df.class_name.apply(lambda x: x.split('_')[1])
 box_df.to_csv('/kaggle/working/box_df.csv')  # 我加
+'''
 
 
 # 針對 train 的資料
-train_path = f'{WORKING_DIR}/results/{config}/train_fold1.csv'
-train_df = pd.read_csv(train_path)
-
-# ===== 篩選 Sagittal 資料 =====
-train_df = train_df[train_df['series_description_y'].isin(['Sagittal T2/STIR', 'Sagittal T1'])]
-
-# ===== 建立必要欄位：study_id, series_id, class_id, class_name, box =====
+config = 'rsna_10classes_yolox_x'
 box_cols = ['x_min', 'y_min', 'x_max', 'y_max']
-required_cols = ['study_id', 'series_id', 'class_id', 'class_name'] + box_cols
-train_box_df = train_df[required_cols].copy()
 
-# ===== 加入 level 與 lr 欄位 =====
-train_box_df['level'] = train_box_df['class_name'].apply(lambda x: x.split('_')[0])
-train_box_df['lr'] = train_box_df['class_name'].apply(lambda x: x.split('_')[1])
+# 讀取 training fold1 預測資料
+pred_df = pd.read_csv(f'{WORKING_DIR}/results/{config}/train_fold1.csv')
 
-# ===== 驗證每個 study 是否都有 10 個 class（錯的就收集起來）=====
+# 從 path 中解析出 study_id 和 series_id
+pred_df['study_id'] = pred_df.path.apply(lambda x: int(x.split('/')[-1].split('___')[0]))
+pred_df['series_id'] = pred_df.path.apply(lambda x: int(x.split('/')[-1].split('___')[1]))
+
+# 只保留 Sagittal T2/STIR 的影像
+tr = pd.read_csv(f'{WORKING_DIR}/csv_train/preprocess_holdout_4/train_with_fold_holdout.csv')
+t2_ids = tr[tr.series_description_y == 'Sagittal T2/STIR'].series_id
+pred_df = pred_df[pred_df['series_id'].isin(t2_ids)]
+
+# 每個 study_id 和 class_id 保留一筆 confidence 最高的 box
+dfs = []
+grouped = pred_df[['study_id', 'conf', 'class_id', 'class_name'] + box_cols].groupby(['study_id', 'class_id'])
+for (study_id, class_id), idf in tqdm(grouped):
+    best_box = idf.loc[idf['conf'].idxmax()]
+    dfs.append(best_box)
+box_df = pd.DataFrame(dfs)
+
+# 確認每個 study_id 最多只有 10 類
 error_dfs = []
-for id, idf in train_box_df.groupby('study_id'):
+for study_id, idf in box_df.groupby('study_id'):
     if len(idf) != 10:
         error_dfs.append(idf)
     assert len(idf) <= 10
 
-# ===== 儲存異常資料 =====
-if error_dfs:
-    error_df = pd.concat(error_dfs)
-    error_df.to_csv(f'{WORKING_DIR}/train_error.csv', index=False)
-    print(f"⚠️ 已儲存異常資料到 train_error.csv（共 {error_df.study_id.nunique()} 個 study）")
+# 將所有不完整的 study_id 預測結果合併存成一份 csv
+if error_dfs:  # 確保有資料才做 concat
+    pd.concat(error_dfs).to_csv('error_dfs.csv', index=False)
 
-# ===== 儲存結果 =====
-train_box_df.to_csv(f'{WORKING_DIR}/box_df_train.csv', index=False)
+# 擴增欄位：level 與 lr
+box_df['level'] = box_df['class_name'].apply(lambda x: x.split('_')[0])
+box_df['lr'] = box_df['class_name'].apply(lambda x: x.split('_')[1])
 
+# 儲存最終版本
+box_df.to_csv('box_df_from_train_fold1.csv', index=False)
 
 
 
