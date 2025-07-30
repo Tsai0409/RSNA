@@ -1,9 +1,9 @@
-# axial_classification.sh
+# sagittal_classification.sh
 #!/bin/bash
 
 # 設定環境變數
 WORKING_DIR="/kaggle/working/duplicate"
-PREPROCESS_SCRIPT="$WORKING_DIR/preprocess_for_axial_classification.py"
+PREPROCESS_SCRIPT="$WORKING_DIR/preprocess_for_sagittal_classification.py"
 TRAIN_SCRIPT="$WORKING_DIR/train_one_fold.py"
 PREDICT_SCRIPT="$WORKING_DIR/predict.py"
 
@@ -17,12 +17,18 @@ PREDICT_SCRIPT="$WORKING_DIR/predict.py"
 
 # 設置 configs 和 folds 變數
 configs=(
-    "rsna_axial_ss_nfn_x2_y2_center_pad0"
-    "rsna_axial_ss_nfn_x2_y6_center_pad0"
-    "rsna_axial_ss_nfn_x2_y8_center_pad10"
+    "rsna_saggital_mil_spinal_crop_x03_y05" 
+    "rsna_saggital_mil_spinal_crop_x03_y07" 
+
+    "rsna_saggital_mil_ss_crop_x03_y05_96" 
+    "rsna_saggital_mil_ss_crop_x03_y07_96" 
+    "rsna_saggital_mil_ss_crop_x03_y2_96" 
+    "rsna_saggital_mil_ss_crop_x1_y07_96" 
     
-    "rsna_axial_spinal_dis3_crop_x05_y6"
-    "rsna_axial_spinal_dis3_crop_x1_y2"
+    "rsna_saggital_mil_nfn_crop_x07_y1_v2" 
+    "rsna_saggital_mil_nfn_crop_x15_y1_v2" 
+    "rsna_saggital_mil_nfn_crop_x03_y1_v2" 
+    "rsna_saggital_mil_nfn_crop_x05_y05_v2"
 )
 # folds=(0 1 2 3 4)
 folds=(1)
@@ -41,12 +47,12 @@ do
         fi
 
         # 執行預測腳本
-        infcmd="python $PREDICT_SCRIPT -c $config -f $fold"
-        echo "Executing: $infcmd"
-        if ! eval $infcmd; then
-            echo "Error: Prediction failed for config $config fold $fold."
-            continue  # 跳過失敗的配置，繼續執行其他
-        fi
+        # infcmd="python $PREDICT_SCRIPT -c $config -f $fold"
+        # echo "Executing: $infcmd"
+        # if ! eval $infcmd; then
+        #     echo "Error: Prediction failed for config $config fold $fold."
+        #     continue  # 跳過失敗的配置，繼續執行其他
+        # fi
 
         echo "----------------------------------------"
     done
