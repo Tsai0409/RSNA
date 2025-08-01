@@ -1022,6 +1022,7 @@ class RSNA2024ModelV2(nn.Module):
 class RSNA2ndModel(nn.Module):
     def __init__(
         self,
+        base_model,  # 我加
         num_classes=1,
 #        base_model=senet_mod(se_resnext50_32x4d, pretrained=pretrain_true),
         pool='avg',
