@@ -183,6 +183,7 @@ if __name__ == "__main__":
         sync_batchnorm=False,  # 禁用 SyncBatchNorm
         # enable_progress_bar=False,
         enable_progress_bar=True,  # 顯示進度條
+        refresh_rate=10,
         resume_from_checkpoint=f'{OUTPUT_PATH}/fold_{args.fold}.ckpt' if cfg.resume else None,  # self.resume = False (all condition)
         accelerator='gpu' if torch.cuda.is_available() else 'cpu',
         devices=devices if torch.cuda.is_available() else None,
