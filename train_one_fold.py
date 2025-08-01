@@ -11,6 +11,10 @@ from pytorch_lightning.plugins import DDPPlugin
 from pytorch_lightning.strategies import DDPStrategy
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
 from pytorch_lightning.loggers.csv_logs import CSVLogger
+from pytorch_lightning.callbacks import TQDMProgressBar
+
+# 建立進度條 callback，refresh_rate 控制每 N 個 step 更新一次
+progress_bar = TQDMProgressBar(refresh_rate=20)
 
 from pdb import set_trace as st
 import warnings
@@ -177,13 +181,13 @@ if __name__ == "__main__":
         benchmark=True,
         limit_train_batches=1.0,
         limit_val_batches=1.0,
-        callbacks=[checkpoint_callback, early_stop_callback, lr_monitor],
+        callbacks=[checkpoint_callback, early_stop_callback, lr_monitor, progress_bar],  # progress_bar 是我加的
         logger=[logger],
         # sync_batchnorm=cfg.sync_batchnorm,
         sync_batchnorm=False,  # 禁用 SyncBatchNorm
-        # enable_progress_bar=False,
-        enable_progress_bar=True,  # 顯示進度條
-        refresh_rate=10,
+        enable_progress_bar=False,
+        # enable_progress_bar=True,  # 顯示進度條
+        # refresh_rate=10,
         resume_from_checkpoint=f'{OUTPUT_PATH}/fold_{args.fold}.ckpt' if cfg.resume else None,  # self.resume = False (all condition)
         accelerator='gpu' if torch.cuda.is_available() else 'cpu',
         devices=devices if torch.cuda.is_available() else None,
