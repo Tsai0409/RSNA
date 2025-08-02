@@ -1164,9 +1164,9 @@ class rsna_saggital_spinal_crop_base(rsna_v1):
         self.model_name = 'convnext_small.in12k_ft_in1k_384'
         self.drop_rate = 0.0
         self.drop_path_rate = 0.0
-        # base_model = timm.create_model(self.model_name, pretrained=True, num_classes=1, drop_rate=self.drop_rate, drop_path_rate=self.drop_path_rate)
-        # self.model = RSNA2ndModel(base_model=base_model, num_classes=len(self.label_features), pool='avg', swin=False)
-        self.model = timm.create_model(self.model_name, pretrained=True, num_classes=self.num_classes, drop_rate=self.drop_rate, drop_path_rate=self.drop_path_rate)
+        base_model = timm.create_model(self.model_name, pretrained=True, num_classes=1, drop_rate=self.drop_rate, drop_path_rate=self.drop_path_rate)
+        self.model = RSNA2ndModel(base_model=base_model, num_classes=len(self.label_features), pool='avg', swin=False)
+        # self.model = timm.create_model(self.model_name, pretrained=True, num_classes=self.num_classes, drop_rate=self.drop_rate, drop_path_rate=self.drop_path_rate)
 
         self.metric = None
         self.memo = ''
