@@ -18,17 +18,17 @@ PREDICT_SCRIPT="$WORKING_DIR/predict.py"
 # 設置 configs 和 folds 變數
 configs=(
     "rsna_saggital_mil_spinal_crop_x03_y05" 
-    "rsna_saggital_mil_spinal_crop_x03_y07" 
+    # "rsna_saggital_mil_spinal_crop_x03_y07" 
 
-    "rsna_saggital_mil_ss_crop_x03_y05_96" 
-    "rsna_saggital_mil_ss_crop_x03_y07_96" 
-    "rsna_saggital_mil_ss_crop_x03_y2_96" 
-    "rsna_saggital_mil_ss_crop_x1_y07_96" 
+    # "rsna_saggital_mil_ss_crop_x03_y05_96" 
+    # "rsna_saggital_mil_ss_crop_x03_y07_96" 
+    # "rsna_saggital_mil_ss_crop_x03_y2_96" 
+    # "rsna_saggital_mil_ss_crop_x1_y07_96" 
     
-    "rsna_saggital_mil_nfn_crop_x07_y1_v2" 
-    "rsna_saggital_mil_nfn_crop_x15_y1_v2" 
-    "rsna_saggital_mil_nfn_crop_x03_y1_v2" 
-    "rsna_saggital_mil_nfn_crop_x05_y05_v2"
+    # "rsna_saggital_mil_nfn_crop_x07_y1_v2" 
+    # "rsna_saggital_mil_nfn_crop_x15_y1_v2" 
+    # "rsna_saggital_mil_nfn_crop_x03_y1_v2" 
+    # "rsna_saggital_mil_nfn_crop_x05_y05_v2"
 )
 # folds=(0 1 2 3 4)
 folds=(1)
