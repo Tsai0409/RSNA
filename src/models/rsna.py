@@ -1023,15 +1023,17 @@ class RSNA2ndModel(nn.Module):
     def __init__(
         self,
         num_classes=1,
-        base_model=senet_mod(se_resnext50_32x4d, pretrained=True),
+        base_model=None,
         pool='avg',
         swin=False,
-        # local_weight_path=None,  # 路徑參數，允許從本地加載權重；我加
     ):
         super().__init__()
         self.swin = swin
         self.criterion = nn.CrossEntropyLoss()
         
+        if base_model is None:
+            raise ValueError("Must provide base_model")
+        self.base_model = base_model
         # self.base_model = senet_mod(se_resnext50_32x4d, pretrained=pretrain_true)
         # 初始化基礎模型
         # self.base_model = senet_mod(se_resnext50_32x4d, pretrained=True)  # 不自動下載預訓練權重
