@@ -1141,7 +1141,8 @@ class rsna_saggital_spinal_crop_base(rsna_v1):
         super().__init__()
         self.fold = fold  # 儲存fold參數
         # self.train_df_path = 'input/sagittal_spinal_range2_rolling5.csv'
-        self.train_df_path = f'{WORKING_DIR}/csv_train/axial_classification_7/sagittal_spinal_range2_rolling5.csv'
+        # self.train_df_path = f'{WORKING_DIR}/csv_train/axial_classification_7/sagittal_spinal_range2_rolling5.csv'
+        self.train_df_path = f'{WORKING_DIR}/csv_train/sagittal_classification_holdout_8/sagittal_spinal_range2_rolling5.csv'
         self.train_df = pd.read_csv(self.train_df_path)
         dfs = []
         col = 'spinal_canal_stenosis'
@@ -1332,14 +1333,16 @@ class rsna_saggital_mil_ss_crop_base(rsna_v1):
     def __init__(self):
         super().__init__()
         # self.train_df_path = 'input/sagittal_right_ss_range2_rolling5.csv'
-        self.train_df_path = f'{WORKING_DIR}/csv_train/axial_classification_7/sagittal_right_ss_range2_rolling5.csv'
+        # self.train_df_path = f'{WORKING_DIR}/csv_train/axial_classification_7/sagittal_right_ss_range2_rolling5.csv'
+        self.train_df_path = f'{WORKING_DIR}/csv_train/sagittal_classification_holdout_8/sagittal_right_ss_range2_rolling5.csv'
         self.train_df = pd.read_csv(self.train_df_path)
         self.train_df['left_right'] = 'right'
         self.train_df['subarticular_stenosis_normal'] = self.train_df['right_subarticular_stenosis_normal'].values
         self.train_df['subarticular_stenosis_moderate'] = self.train_df['right_subarticular_stenosis_moderate'].values
         self.train_df['subarticular_stenosis_severe'] = self.train_df['right_subarticular_stenosis_severe'].values
         # self.add_df_path = 'input/sagittal_left_ss_range2_rolling5.csv'
-        self.add_df_path = f'{WORKING_DIR}/csv_train/axial_classification_7/sagittal_left_ss_range2_rolling5.csv' 
+        # self.add_df_path = f'{WORKING_DIR}/csv_train/axial_classification_7/sagittal_left_ss_range2_rolling5.csv' 
+        self.add_df_path = f'{WORKING_DIR}/csv_train/sagittal_classification_holdout_8/sagittal_left_ss_range2_rolling5.csv' 
         self.add_df = pd.read_csv(self.add_df_path)
         self.add_df['left_right'] = 'left'
         self.add_df['subarticular_stenosis_normal'] = self.add_df['left_subarticular_stenosis_normal'].values
@@ -1768,14 +1771,16 @@ class rsna_saggital_mil_nfn_crop_base(rsna_v1):
     def __init__(self):
         super().__init__()
         # self.train_df_path = 'input/sagittal_right_nfn_range2_rolling5.csv'
-        self.train_df_path = f'{WORKING_DIR}/csv_train/axial_classification_7/sagittal_right_nfn_range2_rolling5.csv'
+        # self.train_df_path = f'{WORKING_DIR}/csv_train/axial_classification_7/sagittal_right_nfn_range2_rolling5.csv'
+        self.train_df_path = f'{WORKING_DIR}/csv_train/sagittal_classification_holdout_8/sagittal_right_nfn_range2_rolling5.csv'
         self.train_df = pd.read_csv(self.train_df_path)
         self.train_df['left_right'] = 'right'
         self.train_df['neural_foraminal_narrowing_normal'] = self.train_df['right_neural_foraminal_narrowing_normal'].values
         self.train_df['neural_foraminal_narrowing_moderate'] = self.train_df['right_neural_foraminal_narrowing_moderate'].values
         self.train_df['neural_foraminal_narrowing_severe'] = self.train_df['right_neural_foraminal_narrowing_severe'].values
         # self.add_df_path = 'input/sagittal_left_nfn_range2_rolling5.csv'
-        self.add_df_path = f'{WORKING_DIR}/csv_train/axial_classification_7/sagittal_left_nfn_range2_rolling5.csv'
+        # self.add_df_path = f'{WORKING_DIR}/csv_train/axial_classification_7/sagittal_left_nfn_range2_rolling5.csv'
+        self.add_df_path = f'{WORKING_DIR}/csv_train/sagittal_classification_holdout_8/sagittal_left_nfn_range2_rolling5.csv'
         self.add_df = pd.read_csv(self.add_df_path)
         self.add_df['left_right'] = 'left'
         self.add_df['neural_foraminal_narrowing_normal'] = self.add_df['left_neural_foraminal_narrowing_normal'].values
