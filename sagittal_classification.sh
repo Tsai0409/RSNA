@@ -44,7 +44,7 @@ do
         # if ! eval $cmd; then
         #     echo "Error: Training failed for config $config fold $fold."
         #     continue  # 跳過失敗的配置，繼續執行其他
-        fi
+        # fi
 
         # 執行預測腳本
         infcmd="python $PREDICT_SCRIPT -c $config -f $fold"
