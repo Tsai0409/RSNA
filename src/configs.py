@@ -238,7 +238,7 @@ class rsna_sagittal_cl(rsna_v1):  # inf_sagittal_slice_2nd.sh
 
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-# classification for axial (stage 1)
+# classification for axial (stage 2)
 class rsna_axial_ss_nfn_crop_base(rsna_v1):
     def __init__(self, fold=0):
         super().__init__()
@@ -422,7 +422,7 @@ class rsna_axial_ss_nfn_x2_y8_center_pad10(rsna_axial_ss_nfn_crop_base):
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-# reduce_noise axial (stage 1)
+# reduce_noise axial (stage 2)
 # class rsna_axial_ss_nfn_x2_y2_center_pad0_reduce_noise(rsna_axial_ss_nfn_crop_base):
 #     def __init__(self, fold=0):
 #         super().__init__()
@@ -646,7 +646,7 @@ class rsna_axial_ss_nfn_x2_y8_center_pad10(rsna_axial_ss_nfn_crop_base):
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-# reduce_noise axial (stage 1)
+# reduce_noise axial (stage 2)
 # train(by clean data) vaild(by original data)
 class rsna_axial_ss_nfn_x2_y2_center_pad0_with_valid(rsna_axial_ss_nfn_crop_base):
     def __init__(self, fold=0):
@@ -889,7 +889,7 @@ class rsna_axial_ss_nfn_x2_y8_center_pad10_with_valid(rsna_axial_ss_nfn_crop_bas
         self.train_df = self.valid_df[~self.valid_df.study_level.isin(noise_study_levels)].reset_index(drop=True)
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-# classification for axial (stage 2)
+# classification for axial (stage 1)
 class rsna_axial_spinal_crop_base(rsna_v1):
     def __init__(self, fold=0):
         super().__init__()
@@ -945,7 +945,7 @@ class rsna_axial_spinal_dis3_crop_x1_y2(rsna_axial_spinal_crop_base):
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-# reduce_noise axial (stage 2)
+# reduce_noise axial (stage 1)
 # version1
 # class rsna_axial_spinal_dis3_crop_x05_y6_reduce_noise(rsna_axial_spinal_dis3_crop_x05_y6):
 #     def __init__(self):
@@ -1046,7 +1046,7 @@ class rsna_axial_spinal_dis3_crop_x1_y2(rsna_axial_spinal_crop_base):
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-# reduce_noise axial (stage 2)
+# reduce_noise axial (stage 1)
 # train(by clean data) vaild(by original data)
 class rsna_axial_spinal_dis3_crop_x05_y6_with_valid(rsna_axial_spinal_dis3_crop_x05_y6):
     def __init__(self, fold=0):
