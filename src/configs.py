@@ -1180,6 +1180,7 @@ class rsna_saggital_spinal_crop_base(rsna_v1):
         self.box_crop = True
         self.box_crop_x_ratio = 1
         self.box_crop_y_ratio = 0.5
+        self.predict_train = False
 
 class rsna_saggital_mil_spinal_crop_x03_y05(rsna_saggital_spinal_crop_base):
     def __init__(self, fold=0):
@@ -1380,6 +1381,7 @@ class rsna_saggital_mil_ss_crop_base(rsna_v1):
         self.box_crop = True
         self.box_crop_x_ratio = 0.4
         self.box_crop_y_ratio = 0.2
+        self.predict_train = False
 
 class rsna_saggital_mil_ss_crop_x03_y05_96(rsna_saggital_mil_ss_crop_base):
     def __init__(self, fold=0):
@@ -1819,6 +1821,7 @@ class rsna_saggital_mil_nfn_crop_base(rsna_v1):
         self.box_crop = True
         self.box_crop_x_ratio = 0.4
         self.box_crop_y_ratio = 0.2
+        self.predict_train = False
 
 class rsna_saggital_mil_nfn_crop_x07_y1_v2(rsna_saggital_mil_nfn_crop_base):
     def __init__(self, fold=0):
