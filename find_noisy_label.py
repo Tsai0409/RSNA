@@ -26,6 +26,7 @@ class ParticipantVisibleError(Exception):
 from scipy.optimize import minimize
 
 WORKING_DIR="/kaggle/working/duplicate"
+classification_fold = 1
 
 # not used
 def get_condition(full_location: str) -> str:
@@ -35,7 +36,8 @@ def get_condition(full_location: str) -> str:
     raise ValueError(f'condition not found in {full_location}')
 
 # sub = pd.read_csv('input/sample_submission.csv')
-sub = pd.read_csv(f'{WORKING_DIR}/csv_train/output_2/myself_submission_fold0.csv')
+# sub = pd.read_csv(f'{WORKING_DIR}/csv_train/output_2/myself_submission_fold0.csv')
+sub = pd.read_csv(f'{WORKING_DIR}/csv_train/output_results/result3/myself_submission_fold0.csv')
 
 label_features = [
     'spinal_canal_stenosis',
@@ -57,7 +59,8 @@ for col in label_features:
 pred_cols15 = ['pred_'+c for c in true_cols15]  # 15 個 各個病狀的嚴重程度
 pred_cols = ['pred_'+c for c in true_cols]  # 75 個 各個病狀的嚴重程度 (包含不同位置)
 # tr = pd.read_csv('input/train_with_fold.csv')
-tr = pd.read_csv(f'{WORKING_DIR}/csv_train/preprocess_4/train_with_fold.csv')
+# tr = pd.read_csv(f'{WORKING_DIR}/csv_train/preprocess_4/train_with_fold.csv')
+tr = pd.read_csv(f'{WORKING_DIR}/csv_train/preprocess_holdout_4/train_with_fold_holdout.csv')
 t1_ids = tr[tr.series_description_y=='Sagittal T1'].series_id
 t2_ids = tr[tr.series_description_y=='Sagittal T2/STIR'].series_id
 
@@ -76,7 +79,7 @@ target_cols = [c for c in true_cols if 'spinal' in c]       # 預測分數 y_sco
 config_pred_cols = pred_cols15  # 15 個 各個病狀的嚴重程度
 
 # oof = pd.concat([pd.read_csv(f'results/rsna_axial_spinal_dis3_crop_x1_y2/oof_fold{fold}.csv') for fold in range(5)])  # 合併 5 fold 的結果
-oof = pd.concat([pd.read_csv(f'{WORKING_DIR}/ckpt/rsna_axial_spinal_dis3_crop_x1_y2/oof_fold{fold}.csv') for fold in range(1)])
+oof = pd.concat([pd.read_csv(f'{WORKING_DIR}/ckpt/rsna_axial_spinal_dis3_crop_x1_y2/oof_fold{classification_fold}.csv') for fold in range(1)])
 # 確認 column
 config_pred_cols = [c for c in config_pred_cols if c in list(oof)]  # 據實際讀入的 oof DataFrame，確認哪些你想要的欄位 config_pred_cols 是真的存在的 -> pred_spinal_canal_stenosis_normal、pred_spinal_canal_stenosis_moderate、pred_spinal_canal_stenosis_severe
 config_cols = [col.replace('pred_', '') for col in config_pred_cols]  # -> spinal_canal_stenosis_normal、spinal_canal_stenosis_moderate、spinal_canal_stenosis_severe
@@ -88,7 +91,7 @@ true = oof[config_cols].values  # -> spinal_canal_stenosis_normal、spinal_canal
 dfs = []
 for config in configs:
     # oof = pd.concat([pd.read_csv(f'results/{config}/oof_fold{fold}.csv') for fold in range(5)])
-    oof = pd.concat([pd.read_csv(f'{WORKING_DIR}/ckpt/{config}/oof_fold{fold}.csv') for fold in range(1)])
+    oof = pd.concat([pd.read_csv(f'{WORKING_DIR}/ckpt/{config}/oof_fold{classification_fold}.csv') for fold in range(1)])
     # score = np.mean([np.mean([roc_auc_score(oof[oof.pred_level==l][col.replace('pred_', '')], oof[oof.pred_level==l][col]) for col in config_pred_cols]) for l in [1,2,3,4,5]])
     # score2 = np.mean([np.mean([log_loss(oof[oof.pred_level==l][col.replace('pred_', '')], sigmoid(oof[oof.pred_level==l][col])) for col in config_pred_cols]) for l in [1,2,3,4,5]])
     score = np.mean([  # 整個 dataframe 算一個
@@ -143,7 +146,7 @@ config_cols = [col.replace('pred_', '') for col in config_pred_cols]
 preds = []
 for config in configs:
     # oof = pd.concat([pd.read_csv(f'results/{config}/oof_fold{fold}.csv') for fold in range(5)])
-    oof = pd.concat([pd.read_csv(f'{WORKING_DIR}/ckpt/{config}/oof_fold{fold}.csv') for fold in range(1)])
+    oof = pd.concat([pd.read_csv(f'{WORKING_DIR}/ckpt/{config}/oof_fold{classification_fold}.csv') for fold in range(1)])
     score = np.mean([log_loss(oof[col.replace('pred_', '')], sigmoid(oof[col])) for col in config_pred_cols])
     score2 = np.mean([roc_auc_score(oof[col.replace('pred_', '')], sigmoid(oof[col])) for col in config_pred_cols])
     print(len(oof), round(score, 4), round(score2, 4), config)
@@ -169,14 +172,14 @@ cols = [
     'subarticular_stenosis_severe'
 ]
 # oof = pd.concat([pd.read_csv(f'results/{configs[0]}/oof_fold{fold}.csv') for fold in range(5)])
-oof = pd.concat([pd.read_csv(f'{WORKING_DIR}/ckpt/{configs[0]}/oof_fold{fold}.csv') for fold in range(1)])
+oof = pd.concat([pd.read_csv(f'{WORKING_DIR}/ckpt/{configs[0]}/oof_fold{classification_fold}.csv') for fold in range(1)])
 config_pred_cols = ['pred_'+c for c in cols]
 config_cols = [col.replace('pred_', '') for col in config_pred_cols]
 
 preds = []
 for config in configs:
     # oof = pd.concat([pd.read_csv(f'results/{config}/oof_fold{fold}.csv') for fold in range(5)])  #.sort_values(['path', 'level'])、
-    oof = pd.concat([pd.read_csv(f'{WORKING_DIR}/ckpt/{config}/oof_fold{fold}.csv') for fold in range(1)])
+    oof = pd.concat([pd.read_csv(f'{WORKING_DIR}/ckpt/{config}/oof_fold{classification_fold}.csv') for fold in range(1)])
     score = np.mean([log_loss(oof[col.replace('pred_', '')], sigmoid(oof[col])) for col in config_pred_cols])
     score2 = np.mean([roc_auc_score(oof[col.replace('pred_', '')], sigmoid(oof[col])) for col in config_pred_cols])
     oof = oof[oof.dis < axial_dis_th]
@@ -208,7 +211,7 @@ config_pred_cols = ['pred_'+c for c in config_cols]
 preds = []
 for config in configs:
     # oof = pd.concat([pd.read_csv(f'results/{config}/oof_fold{fold}.csv') for fold in range(5)])
-    oof = pd.concat([pd.read_csv(f'{WORKING_DIR}/ckpt/{config}/oof_fold{fold}.csv') for fold in range(1)])
+    oof = pd.concat([pd.read_csv(f'{WORKING_DIR}/ckpt/{config}/oof_fold{classification_fold}.csv') for fold in range(1)])
     oof['pred_level'] = oof.level.map({
         'L1/L2': 1,
         'L2/L3': 2,
@@ -253,7 +256,7 @@ config_pred_cols = ['pred_'+c for c in config_cols]
 preds = []
 for config in configs:
     # oof = pd.concat([pd.read_csv(f'results/{config}/oof_fold{fold}.csv') for fold in range(5)])
-    oof = pd.concat([pd.read_csv(f'{WORKING_DIR}/ckpt/{config}/oof_fold{fold}.csv') for fold in range(1)])
+    oof = pd.concat([pd.read_csv(f'{WORKING_DIR}/ckpt/{config}/oof_fold{classification_fold}.csv') for fold in range(1)])
     score = np.mean([log_loss(oof[col.replace('pred_', '')], sigmoid(oof[col])) for col in config_pred_cols])
     score2 = np.mean([roc_auc_score(oof[col.replace('pred_', '')], sigmoid(oof[col])) for col in config_pred_cols])
     print(len(oof), round(score, 4), round(score2, 4), config)
@@ -287,7 +290,7 @@ config_pred_cols = ['pred_'+c for c in config_cols]
 preds = []
 for config in configs:
     # oof = pd.concat([pd.read_csv(f'results/{config}/oof_fold{fold}.csv') for fold in range(5)])
-    oof = pd.concat([pd.read_csv(f'{WORKING_DIR}/ckpt/{config}/oof_fold{fold}.csv') for fold in range(1)])
+    oof = pd.concat([pd.read_csv(f'{WORKING_DIR}/ckpt/{config}/oof_fold{classification_fold}.csv') for fold in range(1)])
     score = np.mean([log_loss(oof[col.replace('pred_', '')], sigmoid(oof[col])) for col in config_pred_cols])
     score2 = np.mean([roc_auc_score(oof[col.replace('pred_', '')], sigmoid(oof[col])) for col in config_pred_cols])
     print(len(oof), round(score, 4), round(score2, 4), config)
