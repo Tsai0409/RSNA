@@ -35,11 +35,11 @@ for config in "${configs[@]}"; do
       continue
     fi
 
-    if [[ "${RUN_PREDICT:-0}" == "1" ]]; then
-      echo "Executing: python \"$PREDICT_SCRIPT\" -c \"$config\" -f \"$fold\""
-      python "$PREDICT_SCRIPT" -c "$config" -f "$fold" || \
-        echo "Error: Prediction failed for config=$config fold=$fold."
-    fi
+    # if [[ "${RUN_PREDICT:-0}" == "1" ]]; then
+    #   echo "Executing: python \"$PREDICT_SCRIPT\" -c \"$config\" -f \"$fold\""
+    #   python "$PREDICT_SCRIPT" -c "$config" -f "$fold" || \
+    #     echo "Error: Prediction failed for config=$config fold=$fold."
+    # fi
 
     echo "----------------------------------------"
   done
