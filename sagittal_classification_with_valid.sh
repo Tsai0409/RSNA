@@ -2,47 +2,46 @@
 #!/bin/bash
 set -euo pipefail
 
+# ====== 路徑設定 ======
 WORKING_DIR="/kaggle/working/duplicate"
-# PREPROCESS_SCRIPT="$WORKING_DIR/preprocess_for_sagittal_classification.py"
+PREPROCESS_SCRIPT="$WORKING_DIR/preprocess_for_sagittal_classification.py"
 TRAIN_SCRIPT="$WORKING_DIR/train_one_fold.py"
-# PREDICT_SCRIPT="$WORKING_DIR/predict.py"   # 需要推論再開
+PREDICT_SCRIPT="$WORKING_DIR/predict.py"
 
-# 1) 先做一次預處理
-# echo "Executing: python \"$PREPROCESS_SCRIPT\""
-# python "$PREPROCESS_SCRIPT"
+# ====== 參數/環境變數 ======
+configs=("$@")                           # 參數 = 要跑的 configs
+read -r -a folds <<< "${FOLDS:-0}"       # 環境變數；可 "1" 或 "0 1"
 
-# 2) 參數：所有參數皆為要執行的 configs（可 1~10 個）
-configs=("$@")
 if [ ${#configs[@]} -eq 0 ]; then
-  echo "Error: no configs provided. Pass 1-10 configs as arguments."
-  exit 2
-fi
-if [ ${#configs[@]} -gt 10 ]; then
-  echo "Warning: more than 10 configs provided; only the first 10 will be used."
-  configs=("${configs[@]:0:10}")
+  echo "Error: no configs provided."; exit 2
 fi
 
-# 3) 單一 fold：從環境變數 FOLD 取得，未指定則預設 0
-fold="${FOLD:-0}"
+echo "Configs:"; printf '  - %s\n' "${configs[@]}"
+echo "Folds:";   printf '  - %s\n' "${folds[@]}"
 
-echo "Configs:"
-printf '  - %s\n' "${configs[@]}"
-echo "Fold: $fold"
+# ====== 可選：預處理 ======
+# if [[ "${RUN_PREPROCESS:-0}" == "1" ]]; then
+#   echo "Executing: python \"$PREPROCESS_SCRIPT\""
+#   python "$PREPROCESS_SCRIPT"
+# fi
 
-# 4) 逐個 config 執行
+# ====== 主流程 ======
 for config in "${configs[@]}"; do
-  echo "Executing: python \"$TRAIN_SCRIPT\" -c \"$config\" -f \"$fold\""
-  if ! python "$TRAIN_SCRIPT" -c "$config" -f "$fold"; then
-    echo "Error: Training failed for config=$config fold=$fold."
-    continue
-  fi
+  for fold in "${folds[@]}"; do
+    echo "Executing: python \"$TRAIN_SCRIPT\" -c \"$config\" -f \"$fold\""
+    if ! python "$TRAIN_SCRIPT" -c "$config" -f "$fold"; then
+      echo "Error: Training failed for config=$config fold=$fold."
+      continue
+    fi
 
-  # 如需推論就解開下面區塊
-  # echo "Executing: python \"$PREDICT_SCRIPT\" -c \"$config\" -f \"$fold\""
-  # python "$PREDICT_SCRIPT" -c "$config" -f "$fold" || \
-  #   echo "Error: Prediction failed for config=$config fold=$fold."
+    if [[ "${RUN_PREDICT:-0}" == "1" ]]; then
+      echo "Executing: python \"$PREDICT_SCRIPT\" -c \"$config\" -f \"$fold\""
+      python "$PREDICT_SCRIPT" -c "$config" -f "$fold" || \
+        echo "Error: Prediction failed for config=$config fold=$fold."
+    fi
 
-  echo "----------------------------------------"
+    echo "----------------------------------------"
+  done
 done
 
 echo "Script completed successfully!"

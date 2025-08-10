@@ -2,19 +2,31 @@
 #!/bin/bash
 set -euo pipefail
 
+# ====== 路徑設定 ======
 WORKING_DIR="/kaggle/working/duplicate"
+PREPROCESS_SCRIPT="$WORKING_DIR/preprocess_for_axial_classification.py"
 TRAIN_SCRIPT="$WORKING_DIR/train_one_fold.py"
-# PREDICT_SCRIPT="$WORKING_DIR/predict.py"   # 需要推論再開
+PREDICT_SCRIPT="$WORKING_DIR/predict.py"
 
-# 參數當作要跑的 configs；FOLDS 為空則預設 0
-configs=("$@")
-read -r -a folds <<< "${FOLDS:-0}"
 
-echo "Configs:"
-printf '  - %s\n' "${configs[@]}"
-echo "Folds:"
-printf '  - %s\n' "${folds[@]}"
+# ====== 參數/環境變數 ======
+configs=("$@")                           # 參數 = 要跑的 configs
+read -r -a folds <<< "${FOLDS:-0}"       # 環境變數；可 "1" 或 "0 1"
 
+if [ ${#configs[@]} -eq 0 ]; then
+  echo "Error: no configs provided."; exit 2
+fi
+
+echo "Configs:"; printf '  - %s\n' "${configs[@]}"
+echo "Folds:";   printf '  - %s\n' "${folds[@]}"
+
+# ====== 可選：預處理 ======
+# if [[ "${RUN_PREPROCESS:-0}" == "1" ]]; then
+#   echo "Executing: python \"$PREPROCESS_SCRIPT\""
+#   python "$PREPROCESS_SCRIPT"
+# fi
+
+# ====== 主流程 ======
 for config in "${configs[@]}"; do
   for fold in "${folds[@]}"; do
     echo "Executing: python \"$TRAIN_SCRIPT\" -c \"$config\" -f \"$fold\""
@@ -22,9 +34,13 @@ for config in "${configs[@]}"; do
       echo "Error: Training failed for config=$config fold=$fold."
       continue
     fi
-    # 如需推論，解除下列註解
-    # echo "Executing: python \"$PREDICT_SCRIPT\" -c \"$config\" -f \"$fold\""
-    # python "$PREDICT_SCRIPT" -c "$config" -f "$fold" || echo "Error: Prediction failed for config=$config fold=$fold."
+
+    if [[ "${RUN_PREDICT:-0}" == "1" ]]; then
+      echo "Executing: python \"$PREDICT_SCRIPT\" -c \"$config\" -f \"$fold\""
+      python "$PREDICT_SCRIPT" -c "$config" -f "$fold" || \
+        echo "Error: Prediction failed for config=$config fold=$fold."
+    fi
+
     echo "----------------------------------------"
   done
 done
