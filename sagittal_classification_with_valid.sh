@@ -1,61 +1,48 @@
 # sagittal_classification.sh
 #!/bin/bash
+set -euo pipefail
 
-# 設定環境變數
 WORKING_DIR="/kaggle/working/duplicate"
 PREPROCESS_SCRIPT="$WORKING_DIR/preprocess_for_sagittal_classification.py"
 TRAIN_SCRIPT="$WORKING_DIR/train_one_fold.py"
-PREDICT_SCRIPT="$WORKING_DIR/predict.py"
+# PREDICT_SCRIPT="$WORKING_DIR/predict.py"   # 需要推論再開
 
-# 執行預處理 (finish)
-cmd="python $PREPROCESS_SCRIPT"
-echo "Executing: $cmd"
-if ! eval $cmd; then
-    echo "Error: Preprocessing failed."
-    exit 1
+# 1) 先做一次預處理
+echo "Executing: python \"$PREPROCESS_SCRIPT\""
+python "$PREPROCESS_SCRIPT"
+
+# 2) 參數：所有參數皆為要執行的 configs（可 1~10 個）
+configs=("$@")
+if [ ${#configs[@]} -eq 0 ]; then
+  echo "Error: no configs provided. Pass 1-10 configs as arguments."
+  exit 2
+fi
+if [ ${#configs[@]} -gt 10 ]; then
+  echo "Warning: more than 10 configs provided; only the first 10 will be used."
+  configs=("${configs[@]:0:10}")
 fi
 
-# 設置 configs 和 folds 變數
-configs=(
-    "rsna_saggital_mil_spinal_crop_x03_y05_with_valid" 
-    "rsna_saggital_mil_spinal_crop_x03_y07_with_valid" 
+# 3) 單一 fold：從環境變數 FOLD 取得，未指定則預設 0
+fold="${FOLD:-0}"
 
-    "rsna_saggital_mil_ss_crop_x03_y05_96_with_valid" 
-    "rsna_saggital_mil_ss_crop_x03_y07_96_with_valid" 
-    "rsna_saggital_mil_ss_crop_x03_y2_96_with_valid" 
-    "rsna_saggital_mil_ss_crop_x1_y07_96_with_valid" 
-    
-    "rsna_saggital_mil_nfn_crop_x07_y1_v2_with_valid" 
-    "rsna_saggital_mil_nfn_crop_x15_y1_v2_with_valid" 
-    "rsna_saggital_mil_nfn_crop_x03_y1_v2_with_valid" 
-    "rsna_saggital_mil_nfn_crop_x05_y05_v2_with_valid"
-)
-# folds=(0 1 2 3 4)
-folds=(1)
+echo "Configs:"
+printf '  - %s\n' "${configs[@]}"
+echo "Fold: $fold"
 
-# 遍歷配置和摺疊數進行訓練與預測
-for config in "${configs[@]}"
-do
-    for fold in "${folds[@]}"
-    do
-        # 執行訓練腳本
-        cmd="python $TRAIN_SCRIPT -c $config -f $fold"
-        echo "Executing: $cmd"
-        if ! eval $cmd; then
-            echo "Error: Training failed for config $config fold $fold."
-            continue  # 跳過失敗的配置，繼續執行其他
-        fi
+# 4) 逐個 config 執行
+for config in "${configs[@]}"; do
+  echo "Executing: python \"$TRAIN_SCRIPT\" -c \"$config\" -f \"$fold\""
+  if ! python "$TRAIN_SCRIPT" -c "$config" -f "$fold"; then
+    echo "Error: Training failed for config=$config fold=$fold."
+    continue
+  fi
 
-        # 執行預測腳本
-        # infcmd="python $PREDICT_SCRIPT -c $config -f $fold"
-        # echo "Executing: $infcmd"
-        # if ! eval $infcmd; then
-        #     echo "Error: Prediction failed for config $config fold $fold."
-        #     continue  # 跳過失敗的配置，繼續執行其他
-        # fi
+  # 如需推論就解開下面區塊
+  # echo "Executing: python \"$PREDICT_SCRIPT\" -c \"$config\" -f \"$fold\""
+  # python "$PREDICT_SCRIPT" -c "$config" -f "$fold" || \
+  #   echo "Error: Prediction failed for config=$config fold=$fold."
 
-        echo "----------------------------------------"
-    done
+  echo "----------------------------------------"
 done
 
 echo "Script completed successfully!"
