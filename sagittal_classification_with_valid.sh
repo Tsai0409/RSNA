@@ -3,13 +3,13 @@
 set -euo pipefail
 
 WORKING_DIR="/kaggle/working/duplicate"
-PREPROCESS_SCRIPT="$WORKING_DIR/preprocess_for_sagittal_classification.py"
+# PREPROCESS_SCRIPT="$WORKING_DIR/preprocess_for_sagittal_classification.py"
 TRAIN_SCRIPT="$WORKING_DIR/train_one_fold.py"
 # PREDICT_SCRIPT="$WORKING_DIR/predict.py"   # 需要推論再開
 
 # 1) 先做一次預處理
-echo "Executing: python \"$PREPROCESS_SCRIPT\""
-python "$PREPROCESS_SCRIPT"
+# echo "Executing: python \"$PREPROCESS_SCRIPT\""
+# python "$PREPROCESS_SCRIPT"
 
 # 2) 參數：所有參數皆為要執行的 configs（可 1~10 個）
 configs=("$@")
