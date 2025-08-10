@@ -16,14 +16,14 @@ PREDICT_SCRIPT="$WORKING_DIR/predict.py"
 # fi
 
 # 設置 configs 和 folds 變數
-configs=(
-    "rsna_axial_ss_nfn_x2_y2_center_pad0_with_valid"
-    "rsna_axial_ss_nfn_x2_y6_center_pad0_with_valid"
-    "rsna_axial_ss_nfn_x2_y8_center_pad10_with_valid"
+# configs=(
+#     "rsna_axial_ss_nfn_x2_y2_center_pad0_with_valid"
+#     "rsna_axial_ss_nfn_x2_y6_center_pad0_with_valid"
+#     "rsna_axial_ss_nfn_x2_y8_center_pad10_with_valid"
     
-    "rsna_axial_spinal_dis3_crop_x05_y6_with_valid"
-    "rsna_axial_spinal_dis3_crop_x1_y2_with_valid"
-)
+#     "rsna_axial_spinal_dis3_crop_x05_y6_with_valid"
+#     "rsna_axial_spinal_dis3_crop_x1_y2_with_valid"
+# )
 # folds=(0 1 2 3 4)
 # folds=(0)
 
@@ -52,15 +52,16 @@ configs=(
 #     done
 # done
 
-# 從命令列參數接收 config 與 fold
-# 參數：前 5 個是 configs，其後全是 folds（可 1 個或多個）
-configs=("${@:5}")
-folds=("${@:6}")
+#!/bin/bash
+set -euo pipefail
 
-# 若沒帶 folds，就預設 0
-# if [ ${#folds[@]} -eq 0 ]; then
-#   folds=(0)
-# fi
+WORKING_DIR="/kaggle/working/duplicate"
+TRAIN_SCRIPT="$WORKING_DIR/train_one_fold.py"
+# PREDICT_SCRIPT="$WORKING_DIR/predict.py"   # 需要再開
+
+# 用參數當 configs；用環境變數 FOLDS（空則預設 0）
+configs=("$@")
+read -r -a folds <<< "${FOLDS:-0}"
 
 echo "Configs:"
 printf '  - %s\n' "${configs[@]}"
@@ -69,11 +70,17 @@ printf '  - %s\n' "${folds[@]}"
 
 for config in "${configs[@]}"; do
   for fold in "${folds[@]}"; do
-    cmd="python \"$TRAIN_SCRIPT\" -c \"$config\" -f \"$fold\""
-    echo "Executing: $cmd"
-    if ! eval "$cmd"; then
+    echo "Executing: python \"$TRAIN_SCRIPT\" -c \"$config\" -f \"$fold\""
+    if ! python "$TRAIN_SCRIPT" -c "$config" -f "$fold"; then
       echo "Error: Training failed for config=$config fold=$fold."
       continue
     fi
-    
+    # 如需推論，解除下列註解
+    # echo "Executing: python \"$PREDICT_SCRIPT\" -c \"$config\" -f \"$fold\""
+    # python "$PREDICT_SCRIPT" -c "$config" -f "$fold" || echo "Error: Prediction failed for config=$config fold=$fold."
+    echo "----------------------------------------"
+  done
+done
+
+
 echo "Script completed successfully!"
