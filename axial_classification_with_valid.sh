@@ -53,17 +53,27 @@ configs=(
 # done
 
 # 從命令列參數接收 config 與 fold
-configs=($1)
-folds=($2)
+# 參數：前 5 個是 configs，其後全是 folds（可 1 個或多個）
+configs=("${@:5}")
+folds=("${@:6}")
+
+# 若沒帶 folds，就預設 0
+# if [ ${#folds[@]} -eq 0 ]; then
+#   folds=(0)
+# fi
+
+echo "Configs:"
+printf '  - %s\n' "${configs[@]}"
+echo "Folds:"
+printf '  - %s\n' "${folds[@]}"
 
 for config in "${configs[@]}"; do
-    for fold in "${folds[@]}"; do
-        cmd="python $TRAIN_SCRIPT -c $config -f $fold"
-        echo "Executing: $cmd"
-        if ! eval $cmd; then
-            echo "Error: Training failed for config $config fold $fold."
-            continue
-        fi
-    done
-
+  for fold in "${folds[@]}"; do
+    cmd="python \"$TRAIN_SCRIPT\" -c \"$config\" -f \"$fold\""
+    echo "Executing: $cmd"
+    if ! eval "$cmd"; then
+      echo "Error: Training failed for config=$config fold=$fold."
+      continue
+    fi
+    
 echo "Script completed successfully!"
