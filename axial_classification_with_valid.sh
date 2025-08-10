@@ -25,20 +25,20 @@ configs=(
     "rsna_axial_spinal_dis3_crop_x1_y2_with_valid"
 )
 # folds=(0 1 2 3 4)
-folds=(0)
+# folds=(0)
 
 # 遍歷配置和摺疊數進行訓練與預測
-for config in "${configs[@]}"
-do
-    for fold in "${folds[@]}"
-    do
-        # 執行訓練腳本
-        cmd="python $TRAIN_SCRIPT -c $config -f $fold"
-        echo "Executing: $cmd"
-        if ! eval $cmd; then
-            echo "Error: Training failed for config $config fold $fold."
-            continue  # 跳過失敗的配置，繼續執行其他
-        fi
+# for config in "${configs[@]}"
+# do
+#     for fold in "${folds[@]}"
+#     do
+#         # 執行訓練腳本
+#         cmd="python $TRAIN_SCRIPT -c $config -f $fold"
+#         echo "Executing: $cmd"
+#         if ! eval $cmd; then
+#             echo "Error: Training failed for config $config fold $fold."
+#             continue  # 跳過失敗的配置，繼續執行其他
+#         fi
 
         # 執行預測腳本
         # infcmd="python $PREDICT_SCRIPT -c $config -f $fold"
@@ -48,8 +48,22 @@ do
         #     continue  # 跳過失敗的配置，繼續執行其他
         # fi
 
-        echo "----------------------------------------"
+#         echo "----------------------------------------"
+#     done
+# done
+
+# 從命令列參數接收 config 與 fold
+configs=($1)
+folds=($2)
+
+for config in "${configs[@]}"; do
+    for fold in "${folds[@]}"; do
+        cmd="python $TRAIN_SCRIPT -c $config -f $fold"
+        echo "Executing: $cmd"
+        if ! eval $cmd; then
+            echo "Error: Training failed for config $config fold $fold."
+            continue
+        fi
     done
-done
 
 echo "Script completed successfully!"
