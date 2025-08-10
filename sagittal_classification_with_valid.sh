@@ -31,7 +31,7 @@ configs=(
     "rsna_saggital_mil_nfn_crop_x05_y05_v2_with_valid"
 )
 # folds=(0 1 2 3 4)
-folds=(0)
+folds=(1)
 
 # 遍歷配置和摺疊數進行訓練與預測
 for config in "${configs[@]}"
@@ -47,12 +47,12 @@ do
         fi
 
         # 執行預測腳本
-        infcmd="python $PREDICT_SCRIPT -c $config -f $fold"
-        echo "Executing: $infcmd"
-        if ! eval $infcmd; then
-            echo "Error: Prediction failed for config $config fold $fold."
-            continue  # 跳過失敗的配置，繼續執行其他
-        fi
+        # infcmd="python $PREDICT_SCRIPT -c $config -f $fold"
+        # echo "Executing: $infcmd"
+        # if ! eval $infcmd; then
+        #     echo "Error: Prediction failed for config $config fold $fold."
+        #     continue  # 跳過失敗的配置，繼續執行其他
+        # fi
 
         echo "----------------------------------------"
     done
