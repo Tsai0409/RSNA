@@ -903,6 +903,9 @@ class rsna_saggital_mil_spinal_crop_x03_y05_with_valid(rsna_saggital_mil_spinal_
         self.valid_df['study_level'] = self.valid_df.study_id.astype(str) + '_' + self.valid_df.level.str.replace('/', '_').str.lower()
         self.valid_df['left_right'] = 'center'
 
+        # 這一行是關鍵：把 valid 的 key 再保險一次統一為小寫底線
+        self.valid_df['study_level'] = self.valid_df['study_level'].astype(str).str.replace('/', '_').str.lower()
+
         # 去除 target 欄位為空的行
         for col in self.label_features:
             self.valid_df = self.valid_df[~self.valid_df[col].isnull()]
@@ -932,6 +935,9 @@ class rsna_saggital_mil_spinal_crop_x03_y07_with_valid(rsna_saggital_mil_spinal_
         self.valid_df['study_level'] = self.valid_df.study_id.astype(str) + '_' + self.valid_df.level.str.replace('/', '_').str.lower()
         self.valid_df['left_right'] = 'center'
 
+        # 這一行是關鍵：把 valid 的 key 再保險一次統一為小寫底線
+        self.valid_df['study_level'] = self.valid_df['study_level'].astype(str).str.replace('/', '_').str.lower()
+        
         for col in self.label_features:
             self.valid_df = self.valid_df[~self.valid_df[col].isnull()]
 
