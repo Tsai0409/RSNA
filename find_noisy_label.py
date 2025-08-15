@@ -514,11 +514,23 @@ tr = tr[['study_id']+cols]
 for c in cols:
     if c in list(df):
         del df[c]
+
+# ===== 新增：統一以 int64 合併 =====
+df['study_id'] = pd.to_numeric(df['study_id'], errors='coerce')
+tr['study_id'] = pd.to_numeric(tr['study_id'], errors='coerce')
+
+df = df.dropna(subset=['study_id'])
+tr = tr.dropna(subset=['study_id'])
+
+df['study_id'] = df['study_id'].astype('int64')
+tr['study_id'] = tr['study_id'].astype('int64')
+# ===== 新增結束 =====
+
 oof = tr.merge(df, on='study_id')
 for c in cols:
     oof.loc[oof[c].isnull(), 'axial_pred_'+c] = np.nan
     oof.loc[oof[c].isnull(), 'sagittal_pred_'+c] = np.nan
-oof.to_csv('oof5.csv')  # 我加 -> 75 個實際 label + 150 預測 label(axial、sagittal)
+oof.to_csv('oof5.csv')  # 我加 -> 75 個實際 label + 150 預測 label(axial、sagittal)  study_id 不為 str
 
 '''
 import numpy as np
