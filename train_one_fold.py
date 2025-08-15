@@ -219,6 +219,7 @@ if __name__ == "__main__":
     # if args.fold == 1: # 現在只要執行 fold 0.1
     #     cfg.train_df.to_csv(f'{OUTPUT_PATH}/train.csv', index=False)  # 把當前使用的檔案存下來
     cfg.train_df.to_csv(f'{OUTPUT_PATH}/{args.config}_train_{args.fold}.csv', index=False)  # 把當前使用的檔案存下來
+    cfg.valid_df.to_csv(f'{OUTPUT_PATH}/{args.config}_valid_{args.fold}.csv', index=False)  # 把當前使用的檔案存下來
     
     os.system(f'rm -f {OUTPUT_PATH}/fold_{args.fold}-v*.ckpt')  # 刪除檔名像 fold_0-v1.ckpt、fold_0-v2.ckpt 的檔案
 
