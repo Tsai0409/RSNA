@@ -679,7 +679,124 @@ class rsna_axial_ss_nfn_x2_y8_center_pad10_with_valid(rsna_axial_ss_nfn_crop_bas
 # reduce_noise axial ResNet50V2(stage 2)
 # train(by clean data) vaild(by original data)
 
-class rsna_axial_ss_nfn_crop_ResNet50V2(rsna_v1):
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class FocalLoss(nn.Module):
+    def __init__(self, alpha=1.0, gamma=2.0, reduction='mean'):
+        super(FocalLoss, self).__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.reduction = reduction
+
+    def forward(self, logits, targets):
+        """
+        logits: [batch_size, num_classes]
+        targets: [batch_size]  (不是 one-hot, 而是 int label, e.g. 0,1,2)
+        """
+        ce_loss = F.cross_entropy(logits, targets, reduction='none')
+        pt = torch.exp(-ce_loss)  # pt = softmax probability of true class
+        focal_loss = self.alpha * (1 - pt) ** self.gamma * ce_loss
+
+        if self.reduction == 'mean':
+            return focal_loss.mean()
+        elif self.reduction == 'sum':
+            return focal_loss.sum()
+        else:
+            return focal_loss
+
+class Baseline_ResNet50V2:
+    def __init__(self):
+        self.memo = ''
+        # self.gpu = 'small'
+        self.gpu = 'v100'
+        self.compe = 'rsna'
+        self.batch_size = 16
+        self.grad_accumulations = 1
+        self.lr = 0.0001
+        self.epochs = 20
+        self.resume = False
+        self.seed = 2023
+        self.tta = 1
+        self.model_name = 'convnext_small.fb_in22k_ft_in1k_384'
+        # self.model_name = 'resnet50'
+        self.num_classes = 1
+        self.model = timm.create_model(self.model_name, pretrained=True, num_classes=self.num_classes)
+        # self.criterion = torch.nn.BCEWithLogitsLoss()
+        self.criterion = FocalLoss(alpha=1.0, gamma=2.0)
+        # self.criterion = torch.nn.BCELoss()
+        # self.transform = medical_v1
+        self.transform = kuma_aug
+        self.image_size = 384
+        self.label_features = ['target']
+        self.metric = roc_auc_score # AUC().torch # MultiAP().torch # MultiAUC().torch
+        self.fp16 = True
+        # self.optimizer = 'adam'
+        self.optimizer = 'adamw'
+        self.scheduler = 'CosineAnnealingWarmRestarts'
+        self.eta_min = 5e-7
+        self.train_by_all_data = False
+        self.early_stop_patience = 1000
+        self.inference = False
+        self.predict_valid = True
+        self.predict_test = False
+        self.logit_to = None
+        self.pretrained_path = None
+        self.sync_batchnorm = True
+        # self.sync_batchnorm = False
+        self.warmup_epochs = -1
+        self.finetune_transform = base_aug_v1
+        self.mixup = False
+        self.arcface = False
+        self.box_crop = None
+        self.predicted_mask_crop = None
+        self.pad_square = False
+        self.resume_epoch = 0
+        self.t_max=30
+        self.save_top_k = 1
+        self.meta_cols = []
+        self.output_features = False
+        self.force_use_model_path_config_when_inf = None
+        self.reset_classifier_when_inf = False
+        self.upsample = None
+        self.in_chans = 3
+        self.add_imsizes_when_inference = [(0, 0)]
+        self.inf_fp16 = False
+        self.distill = False
+        self.reload_dataloaders_every_n_epochs = 0
+        self.tranform_dataset_version = None
+        self.no_trained_model_when_inf = False
+        self.normalize_horiz_orientation = False
+        self.upsample_batch_pos_n = None
+        self.cut_200 = False
+        self.affine_for_gbr = False
+        self.half_dark = False
+        self.crop_by_left_right_line_text = False
+        self.use_wandb = True
+        self.use_last_ckpt_when_inference = True
+        self.inference_only = False
+        self.valid_df = None
+        self.valid_df_path = None
+        self.ema = False
+        self.awp = False
+        self.save_every_epoch_val_preds = False
+
+class rsna_v1_ResNet50V2(Baseline_ResNet50V2):
+    def __init__(self):
+        super().__init__()
+        self.compe = 'rsna_2024'
+        self.predict_valid = True
+        self.predict_test = False
+        self.predict_train = False
+        self.model_name = 'convnext_small.in12k_ft_in1k_384'
+        self.transform = medical_v3  # 定義在：src/utils/augmentations/augmentation.py
+        self.batch_size = 8
+        self.lr = 1e-5
+        self.grad_accumulations = 2
+        self.p_rand_order_v1 = 0
+
+class rsna_axial_ss_nfn_crop_ResNet50V2(rsna_v1_ResNet50V2):
     def __init__(self, fold=0):
         super().__init__()
         cols = []
@@ -929,9 +1046,9 @@ class rsna_axial_spinal_dis3_crop_x1_y2_with_valid(rsna_axial_spinal_dis3_crop_x
 
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-# reduce_noise axial ResNet50V2 (stage 1)
+# reduce_noise axial ResNet50V2(stage 1)
 # train(by clean data) vaild(by original data)
-class rsna_axial_spinal_crop_base_ResNet50V2(rsna_v1):
+class rsna_axial_spinal_crop_base_ResNet50V2(rsna_v1_ResNet50V2):
     def __init__(self, fold=0):
         super().__init__()
         self.fold = fold  # 我加
@@ -1150,6 +1267,98 @@ class rsna_saggital_mil_spinal_crop_x03_y07_with_valid(rsna_saggital_mil_spinal_
         noisy_study_levels = set(noise_df.study_level)
 
         self.train_df = self.valid_df[~self.valid_df.study_level.isin(noisy_study_levels)].reset_index(drop=True)
+
+# ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# reduce_noise sagittal ResNet50V2(stage 1)
+# train(by clean data) vaild(by original data)
+class rsna_v1_ResNet50V2(Baseline_ResNet50V2):
+    def __init__(self):
+        super().__init__()
+        self.compe = 'rsna_2024'
+        self.predict_valid = True
+        self.predict_test = False
+        self.model_name = 'convnext_small.in12k_ft_in1k_384'
+        self.transform = medical_v3  # 定義在：src/utils/augmentations/augmentation.py
+        self.batch_size = 8
+        self.lr = 1e-5
+        self.grad_accumulations = 2
+        self.p_rand_order_v1 = 0
+
+class rsna_saggital_spinal_ResNet50V2(rsna_v1_ResNet50V2):
+    def __init__(self, fold=0):  # 加上fold參數
+        super().__init__()
+        self.fold = fold  # 儲存fold參數
+        # self.train_df_path = 'input/sagittal_spinal_range2_rolling5.csv'
+        # self.train_df_path = f'{WORKING_DIR}/csv_train/axial_classification_7/sagittal_spinal_range2_rolling5.csv'
+        self.train_df_path = f'{WORKING_DIR}/csv_train/sagittal_classification_holdout_8/sagittal_spinal_range2_rolling5.csv'
+        self.train_df = pd.read_csv(self.train_df_path)
+        
+        dfs = []
+        col = 'spinal_canal_stenosis'
+        for level, idf in self.train_df.groupby('level'):
+            idf[f'{col}_normal'] = 0
+            idf[f'{col}_moderate'] = 0
+            idf[f'{col}_severe'] = 0
+            idf.loc[idf[col+'_'+level.replace('/', '_').lower()]=='Normal/Mild', f'{col}_normal'] = 1
+            idf.loc[idf[col+'_'+level.replace('/', '_').lower()]=='Moderate', f'{col}_moderate'] = 1
+            idf.loc[idf[col+'_'+level.replace('/', '_').lower()]=='Severe', f'{col}_severe'] = 1
+            idf = idf[~idf[col+'_'+level.replace('/', '_').lower()].isnull()]
+            dfs.append(idf)
+        self.train_df = pd.concat(dfs)            
+        
+        self.label_features = [
+            'spinal_canal_stenosis_normal',
+            'spinal_canal_stenosis_moderate',
+            'spinal_canal_stenosis_severe',
+        ]
+        self.num_classes = len(self.label_features)
+        # self.model_name = 'convnext_small.in12k_ft_in1k_384'
+        # base_model = timm.create_model(self.model_name, pretrained=True, num_classes=1, drop_rate=self.drop_rate, drop_path_rate=self.drop_path_rate)  # 自動只用 timm 下載的對應模型權重
+        # self.model = RSNA2ndModel(base_model=base_model, num_classes=len(self.label_features), pool='avg', swin=False)
+        self.model_name = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
+        
+        self.metric = None
+        self.memo = ''
+        self.lr = 5.5e-5
+        self.rsna_2024_agg_val = False
+        self.epochs = 4
+        self.image_size = 228  # 128
+        self.batch_size = 16
+        self.grad_accumulations = 1
+
+        self.drop_rate = 0.0
+        self.drop_path_rate = 0.0
+        
+        self.use_sagittal_mil_dataset = True
+        self.box_crop = True
+        self.box_crop_x_ratio = 1
+        self.box_crop_y_ratio = 0.5
+        self.predict_train = False
+
+        self._build_dataframes_center()
+
+    def _build_dataframes_center(self):
+        """建立 sagittal spinal 的 train_df 與 valid_df"""
+        valid_df = self.train_df.copy()
+
+        # 統一 study_level key
+        valid_df['study_level'] = valid_df.study_id.astype(str) + '_' + valid_df.level.str.replace('/', '_').str.lower()
+        valid_df['study_level'] = valid_df['study_level'].astype(str).str.replace('/', '_').str.lower()
+        valid_df['left_right'] = 'center'
+
+        # 去除 target 欄位為空的行
+        for col in self.label_features:
+            valid_df = valid_df[~valid_df[col].isnull()]
+
+        # === 建立 valid_df（保留所有樣本） ===
+        self.valid_df = valid_df.copy()
+
+        # === 建立 train_df（移除 noisy 樣本） ===
+        noise_df = pd.read_csv(f'{WORKING_DIR}/csv_train/noise_reduction_by_oof_holdout_9/noisy_target_level_th08_holdout.csv')
+        noise_df = noise_df[noise_df.target == 'spinal_canal_stenosis']
+        noisy_study_levels = set(noise_df.study_level)
+        self.train_df = valid_df[~valid_df.study_level.isin(noisy_study_levels)].reset_index(drop=True)
+
 
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1430,6 +1639,102 @@ class rsna_saggital_mil_ss_crop_x1_y07_96_with_valid(rsna_saggital_mil_ss_crop_x
         for col in self.label_features:
             self.train_df = self.train_df[~self.train_df[col].isnull()]
             self.valid_df = self.valid_df[~self.valid_df[col].isnull()]
+
+# ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# reduce_noise sagittal ResNet50V2(stage 2)
+# train(by clean data) vaild(by original data)
+class rsna_saggital_mil_ss_ResNet50V2(rsna_v1_ResNet50V2):
+    def __init__(self):
+        super().__init__()
+        # self.train_df_path = 'input/sagittal_right_ss_range2_rolling5.csv'
+        # self.train_df_path = f'{WORKING_DIR}/csv_train/axial_classification_7/sagittal_right_ss_range2_rolling5.csv'
+        self.train_df_path = f'{WORKING_DIR}/csv_train/sagittal_classification_holdout_8/sagittal_right_ss_range2_rolling5.csv'
+        self.train_df = pd.read_csv(self.train_df_path)
+        self.train_df['left_right'] = 'right'
+        self.train_df['subarticular_stenosis_normal'] = self.train_df['right_subarticular_stenosis_normal'].values
+        self.train_df['subarticular_stenosis_moderate'] = self.train_df['right_subarticular_stenosis_moderate'].values
+        self.train_df['subarticular_stenosis_severe'] = self.train_df['right_subarticular_stenosis_severe'].values
+        # self.add_df_path = 'input/sagittal_left_ss_range2_rolling5.csv'
+        # self.add_df_path = f'{WORKING_DIR}/csv_train/axial_classification_7/sagittal_left_ss_range2_rolling5.csv' 
+        self.add_df_path = f'{WORKING_DIR}/csv_train/sagittal_classification_holdout_8/sagittal_left_ss_range2_rolling5.csv'
+        self.add_df = pd.read_csv(self.add_df_path)
+        self.add_df['left_right'] = 'left'
+        self.add_df['subarticular_stenosis_normal'] = self.add_df['left_subarticular_stenosis_normal'].values
+        self.add_df['subarticular_stenosis_moderate'] = self.add_df['left_subarticular_stenosis_moderate'].values
+        self.add_df['subarticular_stenosis_severe'] = self.add_df['left_subarticular_stenosis_severe'].values
+        self.train_df = pd.concat([self.train_df, self.add_df])
+        self.label_features = [
+            'subarticular_stenosis_normal',
+            'subarticular_stenosis_moderate',
+            'subarticular_stenosis_severe',
+        ]
+        l = len(self.train_df)
+        for col in self.label_features:
+            self.train_df = self.train_df[~self.train_df[col].isnull()]
+        print(l, len(self.train_df))
+
+        self.num_classes = len(self.label_features)
+        # self.model_name = 'convnext_small.in12k_ft_in1k_384'
+        # base_model = timm.create_model(self.model_name, pretrained=True, num_classes=1, drop_rate=self.drop_rate, drop_path_rate=self.drop_path_rate)
+        # self.model = RSNA2ndModel(base_model=base_model, num_classes=len(self.label_features), pool='avg', swin=False)
+        self.model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
+
+        # self.metric = MultiAUC(label_features=self.label_features).torch
+        self.metric = None
+        self.memo = ''
+        self.lr = 5.5e-5
+        self.rsna_2024_agg_val = False
+        self.epochs = 6
+        self.batch_size = 16
+        self.grad_accumulations = 1
+        self.use_sagittal_mil_dataset = True
+        
+        self.drop_rate = 0.0
+        self.drop_path_rate = 0.0
+        
+        self.box_crop = True
+        self.box_crop_x_ratio = 0.4
+        self.box_crop_y_ratio = 0.2
+        self.predict_train = False
+
+        self._build_dataframes_bilateral()
+
+    def _build_dataframes_bilateral(self):
+        """建立 sagittal subarticular stenosis 的 train_df / valid_df"""
+
+        # === 讀取右側資料 ===
+        right_df_path = f'{WORKING_DIR}/csv_train/sagittal_classification_holdout_8/sagittal_right_ss_range2_rolling5.csv'
+        right_df = pd.read_csv(right_df_path)
+        right_df['left_right'] = 'right'
+        right_df['subarticular_stenosis_normal'] = right_df['right_subarticular_stenosis_normal']
+        right_df['subarticular_stenosis_moderate'] = right_df['right_subarticular_stenosis_moderate']
+        right_df['subarticular_stenosis_severe'] = right_df['right_subarticular_stenosis_severe']
+        right_df['study_level'] = right_df.study_id.astype(str) + '_' + right_df.level.str.replace('/', '_').str.lower()
+
+        # === 讀取左側資料 ===
+        left_df_path = f'{WORKING_DIR}/csv_train/sagittal_classification_holdout_8/sagittal_left_ss_range2_rolling5.csv'
+        left_df = pd.read_csv(left_df_path)
+        left_df['left_right'] = 'left'
+        left_df['subarticular_stenosis_normal'] = left_df['left_subarticular_stenosis_normal']
+        left_df['subarticular_stenosis_moderate'] = left_df['left_subarticular_stenosis_moderate']
+        left_df['subarticular_stenosis_severe'] = left_df['left_subarticular_stenosis_severe']
+        left_df['study_level'] = left_df.study_id.astype(str) + '_' + left_df.level.str.replace('/', '_').str.lower()
+
+        # === 合併作為 valid_df（保留 noisy） ===
+        self.valid_df = pd.concat([right_df, left_df], ignore_index=True)
+
+        # === 過濾 noisy，建立 train_df ===
+        noise_df = pd.read_csv(f'{WORKING_DIR}/csv_train/noise_reduction_by_oof_holdout_9/noisy_target_level_th08_holdout.csv')
+        noise_df = noise_df[noise_df.target.isin(['right_subarticular_stenosis', 'left_subarticular_stenosis'])]
+        noisy_study_levels = set(noise_df.study_level)
+        self.train_df = self.valid_df[~self.valid_df.study_level.isin(noisy_study_levels)].reset_index(drop=True)
+
+        # === 去除標籤為空的樣本 ===
+        for col in self.label_features:
+            self.train_df = self.train_df[~self.train_df[col].isnull()]
+            self.valid_df = self.valid_df[~self.valid_df[col].isnull()]
+
+
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -1729,3 +2034,101 @@ class rsna_saggital_mil_nfn_crop_x05_y05_v2_with_valid(rsna_saggital_mil_nfn_cro
 
         print(f"Train set size (denoised): {len(self.train_df)}")
         print(f"Valid set size (full, clean labels): {len(self.valid_df)}")
+
+# ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# reduce_noise sagittal ResNet50V2 (stage 3)
+# train(by clean data) vaild(by original data)
+class rsna_saggital_mil_nfn_ResNet50V2(rsna_v1_ResNet50V2):
+    def __init__(self):
+        super().__init__()
+        # self.train_df_path = 'input/sagittal_right_nfn_range2_rolling5.csv'
+        # self.train_df_path = f'{WORKING_DIR}/csv_train/axial_classification_7/sagittal_right_nfn_range2_rolling5.csv'
+        self.train_df_path = f'{WORKING_DIR}/csv_train/sagittal_classification_holdout_8/sagittal_right_nfn_range2_rolling5.csv'
+        self.train_df = pd.read_csv(self.train_df_path)
+        self.train_df['left_right'] = 'right'
+        self.train_df['neural_foraminal_narrowing_normal'] = self.train_df['right_neural_foraminal_narrowing_normal'].values
+        self.train_df['neural_foraminal_narrowing_moderate'] = self.train_df['right_neural_foraminal_narrowing_moderate'].values
+        self.train_df['neural_foraminal_narrowing_severe'] = self.train_df['right_neural_foraminal_narrowing_severe'].values
+        # self.add_df_path = 'input/sagittal_left_nfn_range2_rolling5.csv'
+        # self.add_df_path = f'{WORKING_DIR}/csv_train/axial_classification_7/sagittal_left_nfn_range2_rolling5.csv'
+        self.add_df_path = f'{WORKING_DIR}/csv_train/sagittal_classification_holdout_8/sagittal_left_nfn_range2_rolling5.csv'
+        self.add_df = pd.read_csv(self.add_df_path)
+        self.add_df['left_right'] = 'left'
+        self.add_df['neural_foraminal_narrowing_normal'] = self.add_df['left_neural_foraminal_narrowing_normal'].values
+        self.add_df['neural_foraminal_narrowing_moderate'] = self.add_df['left_neural_foraminal_narrowing_moderate'].values
+        self.add_df['neural_foraminal_narrowing_severe'] = self.add_df['left_neural_foraminal_narrowing_severe'].values
+        self.train_df = pd.concat([self.train_df, self.add_df])
+        self.label_features = [
+            'neural_foraminal_narrowing_normal',
+            'neural_foraminal_narrowing_moderate',
+            'neural_foraminal_narrowing_severe',
+        ]
+        l = len(self.train_df)
+        for col in self.label_features:
+            self.train_df = self.train_df[~self.train_df[col].isnull()]
+        print(l, len(self.train_df))
+
+        self.num_classes = len(self.label_features)
+        # self.model_name = 'convnext_small.in12k_ft_in1k_384'
+        # base_model = timm.create_model(self.model_name, pretrained=True, num_classes=1, drop_rate=self.drop_rate, drop_path_rate=self.drop_path_rate)
+        # self.model = RSNA2ndModel(base_model=base_model, num_classes=len(self.label_features), pool='avg', swin=False)
+
+        self.metric = None
+        self.memo = ''
+        self.lr = 5.5e-5
+        self.rsna_2024_agg_val = False
+        self.epochs = 6
+        self.image_size = 228  # 160
+        self.batch_size = 16
+        self.grad_accumulations = 1
+        self.use_sagittal_mil_dataset = True
+        self.ch_3_crop = True
+        self.drop_rate = 0.0
+        self.drop_path_rate = 0.0
+
+        self.box_crop = True
+        self.box_crop_x_ratio = 0.4
+        self.box_crop_y_ratio = 0.2
+        self.predict_train = False
+        self._build_dataframes_bilateral()
+
+    def _build_dataframes_bilateral(self):
+        """建立 sagittal NFN (neural foraminal narrowing) 的 train_df / valid_df"""
+
+        # === 讀取右側資料 ===
+        right_df_path = f'{WORKING_DIR}/csv_train/sagittal_classification_holdout_8/sagittal_right_nfn_range2_rolling5.csv'
+        right_df = pd.read_csv(right_df_path)
+        right_df['left_right'] = 'right'
+        right_df['neural_foraminal_narrowing_normal'] = right_df['right_neural_foraminal_narrowing_normal']
+        right_df['neural_foraminal_narrowing_moderate'] = right_df['right_neural_foraminal_narrowing_moderate']
+        right_df['neural_foraminal_narrowing_severe'] = right_df['right_neural_foraminal_narrowing_severe']
+        right_df['study_level'] = right_df.study_id.astype(str) + '_' + right_df.level.str.replace('/', '_').str.lower()
+
+        # === 讀取左側資料 ===
+        left_df_path = f'{WORKING_DIR}/csv_train/sagittal_classification_holdout_8/sagittal_left_nfn_range2_rolling5.csv'
+        left_df = pd.read_csv(left_df_path)
+        left_df['left_right'] = 'left'
+        left_df['neural_foraminal_narrowing_normal'] = left_df['left_neural_foraminal_narrowing_normal']
+        left_df['neural_foraminal_narrowing_moderate'] = left_df['left_neural_foraminal_narrowing_moderate']
+        left_df['neural_foraminal_narrowing_severe'] = left_df['left_neural_foraminal_narrowing_severe']
+        left_df['study_level'] = left_df.study_id.astype(str) + '_' + left_df.level.str.replace('/', '_').str.lower()
+
+        # === 建立 valid_df（保留所有資料） ===
+        self.valid_df = pd.concat([right_df, left_df], ignore_index=True)
+
+        # === 過濾 noisy 標記，建立 train_df ===
+        noise_df = pd.read_csv(f'{WORKING_DIR}/csv_train/noise_reduction_by_oof_holdout_9/noisy_target_level_th08_holdout.csv')
+        noise_df = noise_df[noise_df.target.isin([
+            'right_neural_foraminal_narrowing',
+            'left_neural_foraminal_narrowing'
+        ])]
+        noisy_study_levels = set(noise_df.study_level)
+        self.train_df = self.valid_df[~self.valid_df.study_level.isin(noisy_study_levels)].reset_index(drop=True)
+
+        # === 過濾 NaN 標籤樣本 ===
+        l = len(self.train_df)
+        for col in self.label_features:
+            self.train_df = self.train_df[~self.train_df[col].isnull()]
+            self.valid_df = self.valid_df[~self.valid_df[col].isnull()]
+        print(f'Before label NaN filtering: {l}, After: {len(self.train_df)}')
