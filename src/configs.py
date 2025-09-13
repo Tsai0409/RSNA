@@ -820,7 +820,7 @@ class rsna_axial_ss_nfn_crop_ResNet50V2(rsna_v1_ResNet50V2):
         self.image_size = 224  # 384
         self.batch_size = 8
         self.lr = 5.5e-5
-        self.epochs = 7
+        self.epochs = 2
         self.transform = medical_v4
 
         self.box_crop = True
@@ -2037,7 +2037,7 @@ class rsna_saggital_mil_nfn_crop_x05_y05_v2_with_valid(rsna_saggital_mil_nfn_cro
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-# reduce_noise sagittal ResNet50V2 (stage 3)
+# reduce_noise sagittal ResNet50V2(stage 3)
 # train(by clean data) vaild(by original data)
 class rsna_saggital_mil_nfn_ResNet50V2(rsna_v1_ResNet50V2):
     def __init__(self):
