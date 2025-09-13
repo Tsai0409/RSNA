@@ -27,9 +27,9 @@ class ResNet50V2FPN(nn.Module):
         channels = self.backbone.feature_info.channels()  # [C2, C3, C4, C5]
 
         # FPN lateral conv layers
-        self.lateral_c3 = nn.Conv2d(channels[1], feature_size, kernel_size=1)
-        self.lateral_c4 = nn.Conv2d(channels[2], feature_size, kernel_size=1)
-        self.lateral_c5 = nn.Conv2d(channels[3], feature_size, kernel_size=1)
+        self.lateral_c3 = nn.Conv2d(channels[2], feature_size, kernel_size=1)
+        self.lateral_c4 = nn.Conv2d(channels[3], feature_size, kernel_size=1)
+        self.lateral_c5 = nn.Conv2d(channels[4], feature_size, kernel_size=1)
 
         # FPN smoothing convs
         self.smooth_p3 = ConvBlock(feature_size, feature_size, 3)
@@ -37,7 +37,7 @@ class ResNet50V2FPN(nn.Module):
         self.smooth_p5 = ConvBlock(feature_size, feature_size, 3)
 
         # Extra pyramid levels
-        self.p6 = nn.Conv2d(channels[3], feature_size, kernel_size=3, stride=2, padding=1)
+        self.p6 = nn.Conv2d(channels[4], feature_size, kernel_size=3, stride=2, padding=1)
         self.p7 = nn.Conv2d(feature_size, feature_size, kernel_size=3, stride=2, padding=1)
 
         # Dropout + classifier head (類似原始 repo 的 Dense)
