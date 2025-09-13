@@ -36,6 +36,8 @@ from src.models.model_4channels import get_attention, get_resnet34, get_attentio
 from src.models.vae import VAE, ResNet_VAE
 from src.models.model_with_arcface import ArcMarginProduct, AddMarginProduct, ArcMarginProductSubcenter, ArcMarginProductOutCosine, ArcMarginProductSubcenterOutCosine, PudaeArcNet, WithArcface, WhalePrev1stModel, Guie2
 from src.models.with_meta_models import WithMetaModel
+from src.models.resnet50v2_fpn import ResNet50V2FPN
+
 
 from src.utils.augmentations.strong_aug import *
 from src.utils.augmentations.augmentation import *
@@ -671,6 +673,125 @@ class rsna_axial_ss_nfn_x2_y8_center_pad10_with_valid(rsna_axial_ss_nfn_crop_bas
 
         self.train_df = self.valid_df[~self.valid_df.study_level.isin(noise_study_levels)].reset_index(drop=True)
 
+
+# ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# reduce_noise axial ResNet50V2(stage 2)
+# train(by clean data) vaild(by original data)
+
+class rsna_axial_ss_nfn_crop_ResNet50V2(rsna_v1):
+    def __init__(self, fold=0):
+        super().__init__()
+        cols = []
+        label_features = [
+            'neural_foraminal_narrowing',
+            'subarticular_stenosis',
+        ]
+        for col in label_features:
+            cols.append(f'{col}_normal')
+            cols.append(f'{col}_moderate')
+            cols.append(f'{col}_severe')
+
+        self.fold = fold  # 我加
+        self.label_features = cols
+        self.num_classes = len(self.label_features)
+
+        # self.model_name = 'convnext_small.in12k_ft_in1k_384'
+        # self.model = timm.create_model(self.model_name, pretrained=True, num_classes=self.num_classes, drop_rate=self.drop_rate, drop_path_rate=self.drop_path_rate)  # 用 convnext_small.in12k_ft_in1k_384 訓練的
+        self.model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
+        
+        self.image_size = 224  # 384
+        self.batch_size = 8
+        self.lr = 5.5e-5
+        self.epochs = 7
+        self.transform = medical_v4
+
+        self.box_crop = True
+        self.box_crop_x_ratio = 0
+        self.box_crop_y_ratio = 6
+        self.center_pad_ratio = 0
+
+        self.drop_rate = 0.0
+        self.drop_path_rate = 0.0
+        self.metric = None
+        self.memo = ''
+        
+        self.grad_accumulations = 2
+        self.crop_by_xy = False
+        self.rsna_2024_multi_image = False
+        self.rsna_random_sample = False
+        self.rsna_2024_agg_val = False
+        
+        self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_holdout_7/axial_classification_holdout.csv'
+        self._build_dataframes()
+
+    
+    def _build_dataframes(self):
+        def process_df(df, side):
+            df['level'] = df.pred_level.map({
+                1: 'l1_l2',
+                2: 'l2_l3',
+                3: 'l3_l4',
+                4: 'l4_l5',
+                5: 'l5_s1',
+            })
+            df['study_level'] = df.study_id.astype(str) + '_' + df.level.str.replace('/', '_').str.lower()
+            df['left_right'] = side
+
+            if side == 'left':
+                df['x_min'] = (df.x_max + df.x_min) / 2
+                del df['x_max']
+                for c in [
+                    'left_neural_foraminal_narrowing_normal',
+                    'left_neural_foraminal_narrowing_moderate',
+                    'left_neural_foraminal_narrowing_severe',
+                    'left_subarticular_stenosis_normal',
+                    'left_subarticular_stenosis_moderate',
+                    'left_subarticular_stenosis_severe',
+                ]:
+                    df[c.replace('left_', '')] = df[c].values
+                df['x_max'] = df['x_min'] + df['image_width'] / 2
+                if self.center_pad_ratio != 0:
+                    df['x_min'] -= df['image_width'] / self.center_pad_ratio
+            else:
+                df['x_max'] = (df.x_max + df.x_min) / 2
+                del df['x_min']
+                for c in [
+                    'right_neural_foraminal_narrowing_normal',
+                    'right_neural_foraminal_narrowing_moderate',
+                    'right_neural_foraminal_narrowing_severe',
+                    'right_subarticular_stenosis_normal',
+                    'right_subarticular_stenosis_moderate',
+                    'right_subarticular_stenosis_severe',
+                ]:
+                    df[c.replace('right_', '')] = df[c].values
+                df['x_min'] = df['x_max'] - df['image_width'] / 2
+                if self.center_pad_ratio != 0:
+                    df['x_max'] += df['image_width'] / self.center_pad_ratio
+            return df
+
+        # 建立 valid_df（全部保留）
+        valid_left = pd.read_csv(self.train_df_path)
+        valid_left = process_df(valid_left, side='left')
+        valid_right = pd.read_csv(self.train_df_path)
+        valid_right = process_df(valid_right, side='right')
+        self.valid_df = pd.concat([valid_left, valid_right], ignore_index=True)
+
+        # 建立 train_df（去除 noisy）
+        noise_df = pd.read_csv(
+            f'{WORKING_DIR}/csv_train/noise_reduction_by_oof_holdout_9/noisy_target_level_th09_holdout.csv'
+        )
+        noise_df_left = noise_df[
+            (noise_df.target == 'left_neural_foraminal_narrowing') |
+            (noise_df.target == 'left_subarticular_stenosis')
+        ]
+        noise_df_right = noise_df[
+            (noise_df.target == 'right_neural_foraminal_narrowing') |
+            (noise_df.target == 'right_subarticular_stenosis')
+        ]
+        noise_study_levels = set(noise_df_left.study_level) | set(noise_df_right.study_level)
+        self.train_df = self.valid_df[~self.valid_df.study_level.isin(noise_study_levels)].reset_index(drop=True)
+
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # classification for axial (stage 1)
@@ -806,6 +927,87 @@ class rsna_axial_spinal_dis3_crop_x1_y2_with_valid(rsna_axial_spinal_dis3_crop_x
             'spinal_canal_stenosis_severe',
         ]
 
+
+# ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# reduce_noise axial ResNet50V2 (stage 1)
+# train(by clean data) vaild(by original data)
+class rsna_axial_spinal_crop_base_ResNet50V2(rsna_v1):
+    def __init__(self, fold=0):
+        super().__init__()
+        self.fold = fold  # 我加
+        # self.train_df_path = 'input/axial_classification.csv'
+        # self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_7/axial_classification.csv'
+        self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_holdout_7/axial_classification_holdout.csv'
+        self.train_df = pd.read_csv(self.train_df_path)
+
+        cols = []
+        label_features = [
+            'spinal_canal_stenosis',
+        ]
+        for col in label_features:
+            cols.append(f'{col}_normal')
+            cols.append(f'{col}_moderate')
+            cols.append(f'{col}_severe')
+
+        self.label_features = cols
+        self.num_classes = len(self.label_features)
+        
+        # self.model_name = 'convnext_small.in12k_ft_in1k_384'
+        # self.model = timm.create_model(self.model_name, pretrained=True, num_classes=self.num_classes,
+        #     drop_rate=self.drop_rate, drop_path_rate=self.drop_path_rate)
+        self.model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
+        
+        self.image_size = 224  # 384
+        self.batch_size = 8
+        self.grad_accumulations = 2
+        self.lr = 5.5e-5
+        self.epochs = 7
+        self.transform = medical_v3
+
+        self.drop_rate = 0.0
+        self.drop_path_rate = 0.0
+        
+        self.metric = None
+        self.memo = ''
+        self.crop_by_xy = False
+        self.rsna_2024_multi_image = False
+        self.rsna_random_sample = False
+        self.rsna_2024_agg_val = False
+        
+        self.box_crop = True
+        self.box_crop_x_ratio = 2
+        self.box_crop_y_ratio = 6
+
+        self._build_dataframes_center()
+
+    def _build_dataframes_center(self):
+        valid_df = pd.read_csv(self.train_df_path)
+        valid_df['level'] = valid_df.pred_level.map({
+            1: 'l1_l2',
+            2: 'l2_l3',
+            3: 'l3_l4',
+            4: 'l4_l5',
+            5: 'l5_s1',
+        })
+        valid_df['study_level'] = valid_df.study_id.astype(str) + '_' + valid_df.level.str.replace('/', '_').str.lower()
+        valid_df['left_right'] = 'center'  # 中央對稱
+
+        # valid 資料：全部保留
+        self.valid_df = valid_df.copy()
+
+        # train 資料：過濾 noisy
+        noise_df = pd.read_csv(
+            f'{WORKING_DIR}/csv_train/noise_reduction_by_oof_holdout_9/noisy_target_level_th09_holdout.csv'
+        )
+        noise_df = noise_df[noise_df.target == 'spinal_canal_stenosis']
+        noisy_study_levels = set(noise_df.study_level)
+        self.train_df = valid_df[~valid_df.study_level.isin(noisy_study_levels)].reset_index(drop=True)
+
+        cols = [
+            'spinal_canal_stenosis_normal',
+            'spinal_canal_stenosis_moderate',
+            'spinal_canal_stenosis_severe',
+        ]
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 

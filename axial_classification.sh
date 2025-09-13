@@ -17,15 +17,11 @@ PREDICT_SCRIPT="$WORKING_DIR/predict.py"
 
 # 設置 configs 和 folds 變數
 configs=(
-    "rsna_axial_ss_nfn_x2_y2_center_pad0"
-    "rsna_axial_ss_nfn_x2_y6_center_pad0"
-    "rsna_axial_ss_nfn_x2_y8_center_pad10"
-    
-    "rsna_axial_spinal_dis3_crop_x05_y6"
-    "rsna_axial_spinal_dis3_crop_x1_y2"
+    "rsna_axial_ss_nfn_crop_ResNet50V2"
+    # "rsna_axial_spinal_crop_base_ResNet50V2"
 )
 # folds=(0 1 2 3 4)
-folds=(1)
+folds=(0)
 
 # 遍歷配置和摺疊數進行訓練與預測
 for config in "${configs[@]}"
@@ -33,20 +29,20 @@ do
     for fold in "${folds[@]}"
     do
         # 執行訓練腳本
-        # cmd="python $TRAIN_SCRIPT -c $config -f $fold"
-        # echo "Executing: $cmd"
-        # if ! eval $cmd; then
-        #     echo "Error: Training failed for config $config fold $fold."
-        #     continue  # 跳過失敗的配置，繼續執行其他
-        # fi
-
-        # 執行預測腳本
-        infcmd="python $PREDICT_SCRIPT -c $config -f $fold"
-        echo "Executing: $infcmd"
-        if ! eval $infcmd; then
-            echo "Error: Prediction failed for config $config fold $fold."
+        cmd="python $TRAIN_SCRIPT -c $config -f $fold"
+        echo "Executing: $cmd"
+        if ! eval $cmd; then
+            echo "Error: Training failed for config $config fold $fold."
             continue  # 跳過失敗的配置，繼續執行其他
         fi
+
+        # 執行預測腳本
+        # infcmd="python $PREDICT_SCRIPT -c $config -f $fold"
+        # echo "Executing: $infcmd"
+        # if ! eval $infcmd; then
+        #     echo "Error: Prediction failed for config $config fold $fold."
+        #     continue  # 跳過失敗的配置，繼續執行其他
+        # fi
 
         echo "----------------------------------------"
     done
