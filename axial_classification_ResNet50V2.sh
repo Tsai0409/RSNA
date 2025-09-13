@@ -17,11 +17,8 @@ PREDICT_SCRIPT="$WORKING_DIR/predict.py"
 
 # 設置 configs 和 folds 變數
 configs=(
-    "rsna_axial_ss_nfn_x2_y2_center_pad0"
-    "rsna_axial_ss_nfn_x2_y6_center_pad0"
-    "rsna_axial_ss_nfn_x2_y8_center_pad10"
-    "rsna_axial_spinal_dis3_crop_x05_y6"
-    "rsna_axial_spinal_dis3_crop_x1_y2"
+    "rsna_axial_ss_nfn_crop_ResNet50V2"
+    "rsna_axial_spinal_crop_base_ResNet50V2"
 )
 # folds=(0 1 2 3 4)
 folds=(0)
