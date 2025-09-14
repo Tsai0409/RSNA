@@ -820,7 +820,7 @@ class rsna_axial_ss_nfn_crop_ResNet50V2(rsna_v1_ResNet50V2):
         self.image_size = 224  # 384
         self.batch_size = 8
         self.lr = 5.5e-5
-        self.epochs = 2
+        self.epochs = 1
         self.transform = medical_v4
 
         self.box_crop = True
