@@ -821,12 +821,12 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         self.image_size = 224  # 384
         self.batch_size = 8
         self.lr = 5.5e-5
-        self.epochs = 5
+        self.epochs = 10
         self.transform = medical_v4
 
         self.box_crop = True
-        self.box_crop_x_ratio = 0
-        self.box_crop_y_ratio = 6
+        self.box_crop_x_ratio = 1  # 0
+        self.box_crop_y_ratio = 2  # 6
         self.center_pad_ratio = 0
 
         self.drop_rate = 0.0
@@ -1079,7 +1079,7 @@ class rsna_axial_spinal_ResNet50V2(rsna_v1_ResNet50V2):
         self.batch_size = 8
         self.grad_accumulations = 2
         self.lr = 5.5e-5
-        self.epochs = 5
+        self.epochs = 10
         self.transform = medical_v3
 
         self.drop_rate = 0.0
@@ -1093,8 +1093,8 @@ class rsna_axial_spinal_ResNet50V2(rsna_v1_ResNet50V2):
         self.rsna_2024_agg_val = False
         
         self.box_crop = True
-        self.box_crop_x_ratio = 2
-        self.box_crop_y_ratio = 6
+        self.box_crop_x_ratio = 1  # 2
+        self.box_crop_y_ratio = 2  # 6
 
         self._build_dataframes_center()
 
@@ -1324,7 +1324,7 @@ class rsna_saggital_mil_spinal_ResNet50V2(rsna_v1_ResNet50V2):
         self.memo = ''
         self.lr = 5.5e-5
         self.rsna_2024_agg_val = False
-        self.epochs = 4
+        self.epochs = 10  # 4
         self.image_size = 228  # 128
         self.batch_size = 16
         self.grad_accumulations = 1
@@ -1334,8 +1334,8 @@ class rsna_saggital_mil_spinal_ResNet50V2(rsna_v1_ResNet50V2):
         
         self.use_sagittal_mil_dataset = True
         self.box_crop = True
-        self.box_crop_x_ratio = 1
-        self.box_crop_y_ratio = 0.5
+        self.box_crop_x_ratio = 1  # 1
+        self.box_crop_y_ratio = 1  # 0.5
         self.predict_train = False
 
         self._build_dataframes_center()
@@ -1689,7 +1689,7 @@ class rsna_saggital_mil_ss_ResNet50V2(rsna_v1_ResNet50V2):
         self.memo = ''
         self.lr = 5.5e-5
         self.rsna_2024_agg_val = False
-        self.epochs = 6
+        self.epochs = 10  # 6
         self.batch_size = 16
         self.grad_accumulations = 1
         self.use_sagittal_mil_dataset = True
@@ -1698,8 +1698,8 @@ class rsna_saggital_mil_ss_ResNet50V2(rsna_v1_ResNet50V2):
         self.drop_path_rate = 0.0
         
         self.box_crop = True
-        self.box_crop_x_ratio = 0.4
-        self.box_crop_y_ratio = 0.2
+        self.box_crop_x_ratio = 1  # 0.4
+        self.box_crop_y_ratio = 1  # 0.2
         self.predict_train = False
 
         self._build_dataframes_bilateral()
@@ -2086,7 +2086,7 @@ class rsna_saggital_mil_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         self.memo = ''
         self.lr = 5.5e-5
         self.rsna_2024_agg_val = False
-        self.epochs = 6
+        self.epochs = 10  # 6
         self.image_size = 228  # 160
         self.batch_size = 16
         self.grad_accumulations = 1
@@ -2096,8 +2096,8 @@ class rsna_saggital_mil_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         self.drop_path_rate = 0.0
 
         self.box_crop = True
-        self.box_crop_x_ratio = 0.4
-        self.box_crop_y_ratio = 0.2
+        self.box_crop_x_ratio = 1  # 0.4
+        self.box_crop_y_ratio = 1  # 0.2
         self.predict_train = False
         self._build_dataframes_bilateral()
 
