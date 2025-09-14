@@ -797,7 +797,7 @@ class rsna_v1_ResNet50V2(Baseline_ResNet50V2):
         self.grad_accumulations = 2
         self.p_rand_order_v1 = 0
 
-class rsna_axial_ss_nfn_crop_ResNet50V2(rsna_v1_ResNet50V2):
+class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
     def __init__(self, fold=0):
         super().__init__()
         cols = []
@@ -821,7 +821,7 @@ class rsna_axial_ss_nfn_crop_ResNet50V2(rsna_v1_ResNet50V2):
         self.image_size = 224  # 384
         self.batch_size = 8
         self.lr = 5.5e-5
-        self.epochs = 1
+        self.epochs = 5
         self.transform = medical_v4
 
         self.box_crop = True
@@ -1049,7 +1049,7 @@ class rsna_axial_spinal_dis3_crop_x1_y2_with_valid(rsna_axial_spinal_dis3_crop_x
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # reduce_noise axial ResNet50V2(stage 1)
 # train(by clean data) vaild(by original data)
-class rsna_axial_spinal_crop_base_ResNet50V2(rsna_v1_ResNet50V2):
+class rsna_axial_spinal_ResNet50V2(rsna_v1_ResNet50V2):
     def __init__(self, fold=0):
         super().__init__()
         self.fold = fold  # 我加
@@ -1079,7 +1079,7 @@ class rsna_axial_spinal_crop_base_ResNet50V2(rsna_v1_ResNet50V2):
         self.batch_size = 8
         self.grad_accumulations = 2
         self.lr = 5.5e-5
-        self.epochs = 7
+        self.epochs = 5
         self.transform = medical_v3
 
         self.drop_rate = 0.0

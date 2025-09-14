@@ -45,3 +45,8 @@ for config in "${configs[@]}"; do
 done
 
 echo "Script completed successfully!"
+
+
+# "rsna_saggital_mil_spinal_ResNet50V2"
+# "rsna_saggital_mil_ss_ResNet50V2"
+# "rsna_saggital_mil_nfn_ResNet50V2"
