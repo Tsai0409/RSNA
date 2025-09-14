@@ -36,7 +36,8 @@ from src.models.model_4channels import get_attention, get_resnet34, get_attentio
 from src.models.vae import VAE, ResNet_VAE
 from src.models.model_with_arcface import ArcMarginProduct, AddMarginProduct, ArcMarginProductSubcenter, ArcMarginProductOutCosine, ArcMarginProductSubcenterOutCosine, PudaeArcNet, WithArcface, WhalePrev1stModel, Guie2
 from src.models.with_meta_models import WithMetaModel
-from src.models.resnet50v2_fpn import ResNet50V2FPN
+from src.models.resnet50v2_fpn import ResNet50V2FPN  # multiscale model
+from src.models.mil import SagittalMILModel  # multiscale model
 
 
 from src.utils.augmentations.strong_aug import *
@@ -1315,7 +1316,9 @@ class rsna_saggital_mil_spinal_ResNet50V2(rsna_v1_ResNet50V2):
         # self.model_name = 'convnext_small.in12k_ft_in1k_384'
         # base_model = timm.create_model(self.model_name, pretrained=True, num_classes=1, drop_rate=self.drop_rate, drop_path_rate=self.drop_path_rate)  # 自動只用 timm 下載的對應模型權重
         # self.model = RSNA2ndModel(base_model=base_model, num_classes=len(self.label_features), pool='avg', swin=False)
-        self.model_name = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
+        # self.model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
+        base_model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
+        self.model = SagittalMILModel(base_model, num_classes=self.num_classes, pooling="attention")
         
         self.metric = None
         self.memo = ''
@@ -1677,7 +1680,9 @@ class rsna_saggital_mil_ss_ResNet50V2(rsna_v1_ResNet50V2):
         # self.model_name = 'convnext_small.in12k_ft_in1k_384'
         # base_model = timm.create_model(self.model_name, pretrained=True, num_classes=1, drop_rate=self.drop_rate, drop_path_rate=self.drop_path_rate)
         # self.model = RSNA2ndModel(base_model=base_model, num_classes=len(self.label_features), pool='avg', swin=False)
-        self.model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
+        # self.model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
+        base_model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
+        self.model = SagittalMILModel(base_model, num_classes=self.num_classes, pooling="attention")
 
         # self.metric = MultiAUC(label_features=self.label_features).torch
         self.metric = None
@@ -2073,6 +2078,9 @@ class rsna_saggital_mil_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         # self.model_name = 'convnext_small.in12k_ft_in1k_384'
         # base_model = timm.create_model(self.model_name, pretrained=True, num_classes=1, drop_rate=self.drop_rate, drop_path_rate=self.drop_path_rate)
         # self.model = RSNA2ndModel(base_model=base_model, num_classes=len(self.label_features), pool='avg', swin=False)
+        # self.model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
+        base_model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
+        self.model = SagittalMILModel(base_model, num_classes=self.num_classes, pooling="attention")
 
         self.metric = None
         self.memo = ''
