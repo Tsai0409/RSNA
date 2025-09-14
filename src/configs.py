@@ -1284,7 +1284,7 @@ class rsna_v1_ResNet50V2(Baseline_ResNet50V2):
         self.grad_accumulations = 2
         self.p_rand_order_v1 = 0
 
-class rsna_saggital_spinal_ResNet50V2(rsna_v1_ResNet50V2):
+class rsna_saggital_mil_spinal_ResNet50V2(rsna_v1_ResNet50V2):
     def __init__(self, fold=0):  # 加上fold參數
         super().__init__()
         self.fold = fold  # 儲存fold參數
