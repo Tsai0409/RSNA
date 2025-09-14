@@ -48,7 +48,7 @@ class ResNet50V2FPN(nn.Module):
         # Backbone features: [C2, C3, C4, C5]
         # c2, c3, c4, c5 = self.backbone(x)
         features = self.backbone(x)   # timm 會回傳一個 list
-        print([f.shape for f in features])  # ← 在這裡 debug 看看輸出有幾層
+        # print([f.shape for f in features])  # ← 在這裡 debug 看看輸出有幾層
 
         # 你現在的程式碼假設只有 4 層
         c2, c3, c4, c5 = features[1:]  # 如果有 5 層，這樣寫比較保險
