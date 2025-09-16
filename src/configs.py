@@ -895,6 +895,8 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         valid_right = process_df(valid_right, side='right')
         self.valid_df = pd.concat([valid_left, valid_right], ignore_index=True)
 
+        train_df = self.valid_df.copy()
+
         # 建立 train_df（去除 noisy）
         noise_df = pd.read_csv(
             f'{WORKING_DIR}/csv_train/noise_reduction_by_oof_holdout_9/noisy_target_level_th09_holdout.csv'
@@ -908,7 +910,7 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
             (noise_df.target == 'right_subarticular_stenosis')
         ]
         noise_study_levels = set(noise_df_left.study_level) | set(noise_df_right.study_level)
-        self.train_df = self.valid_df[~self.valid_df.study_level.isin(noise_study_levels)].reset_index(drop=True)
+        self.train_df = train_df[~train_df.study_level.isin(noise_study_levels)].reset_index(drop=True)
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -1278,6 +1280,7 @@ class rsna_v1_ResNet50V2(Baseline_ResNet50V2):
         self.compe = 'rsna_2024'
         self.predict_valid = True
         self.predict_test = False
+        self.predict_train = False
         self.model_name = 'convnext_small.in12k_ft_in1k_384'
         self.transform = medical_v3  # 定義在：src/utils/augmentations/augmentation.py
         self.batch_size = 8
