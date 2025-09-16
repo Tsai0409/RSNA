@@ -828,6 +828,7 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         self.box_crop_x_ratio = 1  # 0
         self.box_crop_y_ratio = 2  # 6
         self.center_pad_ratio = 0
+        self.image_width_ratio = 1
 
         self.drop_rate = 0.0
         self.drop_path_rate = 0.0
@@ -868,7 +869,7 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
                     'left_subarticular_stenosis_severe',
                 ]:
                     df[c.replace('left_', '')] = df[c].values
-                df['x_max'] = df['x_min'] + df['image_width'] / 2
+                df['x_max'] = df['x_min'] + df['image_width'] / self.image_width_ratio
                 if self.center_pad_ratio != 0:
                     df['x_min'] -= df['image_width'] / self.center_pad_ratio
             else:
@@ -883,7 +884,7 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
                     'right_subarticular_stenosis_severe',
                 ]:
                     df[c.replace('right_', '')] = df[c].values
-                df['x_min'] = df['x_max'] - df['image_width'] / 2
+                df['x_min'] = df['x_max'] - df['image_width'] / self.image_width_ratio
                 if self.center_pad_ratio != 0:
                     df['x_max'] += df['image_width'] / self.center_pad_ratio
             return df
