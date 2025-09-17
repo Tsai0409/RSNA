@@ -707,6 +707,32 @@ class FocalLoss(nn.Module):
         else:
             return focal_loss
 
+class MultiLabelFocalLoss(nn.Module):
+    def __init__(self, alpha=1.0, gamma=2.0, reduction='mean'):
+        super().__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.reduction = reduction
+
+    def forward(self, logits, targets):
+        """
+        logits: [batch_size, num_classes]   # raw outputs
+        targets: [batch_size, num_classes]  # one-hot or multi-label (0/1 per class)
+        """
+        bce_loss = F.binary_cross_entropy_with_logits(
+            logits, targets.float(), reduction='none'
+        )
+        pt = torch.exp(-bce_loss)
+        focal_loss = self.alpha * (1 - pt) ** self.gamma * bce_loss
+
+        if self.reduction == 'mean':
+            return focal_loss.mean()
+        elif self.reduction == 'sum':
+            return focal_loss.sum()
+        else:
+            return focal_loss
+
+
 class Baseline_ResNet50V2:
     def __init__(self):
         self.memo = ''
@@ -821,6 +847,7 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         self.lr = 5.5e-5
         self.epochs = 10
         self.transform = medical_v4
+        self.criterion = MultiLabelFocalLoss()
 
         self.box_crop = True
         self.box_crop_x_ratio = 1
