@@ -520,7 +520,7 @@ class rsna_axial_ss_nfn_x2_y6_center_pad0_with_valid(rsna_axial_ss_nfn_crop_base
         self.box_crop_y_ratio = 6
         center_pad_ratio = 0
         self.fold = fold
-        self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_7/axial_classification.csv'
+        # self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_7/axial_classification.csv'
         self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_holdout_7/axial_classification_holdout.csv'
 
         def process_df(df, side):
@@ -790,7 +790,7 @@ class rsna_v1_ResNet50V2(Baseline_ResNet50V2):
         self.predict_valid = True
         self.predict_test = False
         self.predict_train = False
-        self.model_name = 'convnext_small.in12k_ft_in1k_384'
+        # self.model_name = 'convnext_small.in12k_ft_in1k_384'
         self.transform = medical_v3  # 定義在：src/utils/augmentations/augmentation.py
         self.batch_size = 8
         self.lr = 1e-5
@@ -814,21 +814,19 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         self.label_features = cols
         self.num_classes = len(self.label_features)
 
-        # self.model_name = 'convnext_small.in12k_ft_in1k_384'
-        # self.model = timm.create_model(self.model_name, pretrained=True, num_classes=self.num_classes, drop_rate=self.drop_rate, drop_path_rate=self.drop_path_rate)  # 用 convnext_small.in12k_ft_in1k_384 訓練的
         self.model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
         
-        self.image_size = 224  # 384
+        self.image_size = 224
         self.batch_size = 8
         self.lr = 5.5e-5
         self.epochs = 10
         self.transform = medical_v4
 
         self.box_crop = True
-        self.box_crop_x_ratio = 1  # 0
-        self.box_crop_y_ratio = 2  # 6
+        self.box_crop_x_ratio = 1
+        self.box_crop_y_ratio = 2
         self.center_pad_ratio = 0
-        self.image_width_ratio = 1
+        self.image_width_ratio = 1  # 👈 保留這個，之後 _build_dataframes 用得到
 
         self.drop_rate = 0.0
         self.drop_path_rate = 0.0
@@ -844,8 +842,8 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_holdout_7/axial_classification_holdout.csv'
         self._build_dataframes()
 
-    
     def _build_dataframes(self):
+        # ----- 共用欄位處理 -----
         def process_df(df, side):
             df['level'] = df.pred_level.map({
                 1: 'l1_l2',
@@ -889,16 +887,18 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
                     df['x_max'] += df['image_width'] / self.center_pad_ratio
             return df
 
-        # 建立 valid_df（全部保留）
+        # ----- 建立 valid_df（保留所有資料） -----
         valid_left = pd.read_csv(self.train_df_path)
         valid_left = process_df(valid_left, side='left')
+
         valid_right = pd.read_csv(self.train_df_path)
         valid_right = process_df(valid_right, side='right')
+
         self.valid_df = pd.concat([valid_left, valid_right], ignore_index=True)
 
+        # ----- 建立 train_df（去除 noisy 資料） -----
         train_df = self.valid_df.copy()
 
-        # 建立 train_df（去除 noisy）
         noise_df = pd.read_csv(
             f'{WORKING_DIR}/csv_train/noise_reduction_by_oof_holdout_9/noisy_target_level_th09_holdout.csv'
         )
@@ -911,7 +911,9 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
             (noise_df.target == 'right_subarticular_stenosis')
         ]
         noise_study_levels = set(noise_df_left.study_level) | set(noise_df_right.study_level)
+
         self.train_df = train_df[~train_df.study_level.isin(noise_study_levels)].reset_index(drop=True)
+
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
