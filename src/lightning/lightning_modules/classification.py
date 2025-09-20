@@ -13,6 +13,9 @@ from sklearn.metrics import roc_auc_score
 from pdb import set_trace as st
 from .scheduler_optimizer import get_optimizer, get_scheduler
 
+from torchmetrics import Precision, Recall, F1Score, ConfusionMatrix, Accuracy
+import torch
+
 class AWP:
     def __init__(
         self, model, optimizer, *, adv_param="weight", adv_lr=0.001, adv_eps=0.001
@@ -109,6 +112,22 @@ class MyLightningModule(pl.LightningModule):
         # if cfg.pretrained_path is not None:
         #     self.model.load_state_dict(torch.load(cfg.pretrained_path)['state_dict'])
         self.cfg = cfg
+
+        num_classes = cfg.num_classes if hasattr(cfg, "num_classes") else 2
+
+        # Training metrics
+        self.train_acc = Accuracy(num_classes=num_classes, average="macro")
+        self.train_precision = Precision(num_classes=num_classes, average="macro")
+        self.train_recall = Recall(num_classes=num_classes, average="macro")
+        self.train_f1 = F1Score(num_classes=num_classes, average="macro")
+        self.train_confmat = ConfusionMatrix(num_classes=num_classes)
+
+        # Validation metrics
+        self.val_acc = Accuracy(num_classes=num_classes, average="macro")
+        self.precision = Precision(num_classes=num_classes, average="macro")
+        self.recall = Recall(num_classes=num_classes, average="macro")
+        self.f1 = F1Score(num_classes=num_classes, average="macro")
+        self.confmat = ConfusionMatrix(num_classes=num_classes)
 
         # self.awp = False (all condition)
         if self.cfg.awp:  # AWP(Adversarial Weight Perturbation)（對抗性權重擾動），使模型對微小的權重變動更穩健，通常通過增加一個小的擾動來模擬最壞情況，從而提高模型的泛化能力；AWP 會在計算損失之前對模型的權重施加一個對抗性擾動，使模型在「更困難」的情況下進行訓練，以提高模型的魯棒性
@@ -214,13 +233,64 @@ class MyLightningModule(pl.LightningModule):
             #    損失函數(Loss Function）：衡量模型預測結果與實際標籤之間的誤差，用來指導權重更新。
             # 所有這些操作最終都會在 training_step 中的反向傳播過程後由 Lightning 自動處理。
             '''
-        
+
         # self.awp = False (all condition)
         if self.cfg.awp:
             self.awp.restore()  # Restore model parameters 還原
 
+        # preds = torch.argmax(logits, dim=1)
+        # y_true = torch.argmax(targets, dim=1) if targets.ndim > 1 else targets
+        # self.train_acc.update(preds, y_true)
+
+        # self.log("train_acc", self.train_acc, on_step=False, on_epoch=True, prog_bar=True)
+        # self.log("train_loss", loss.item(), on_step=False, on_epoch=True)
+        
+        # 計算 preds / y_true
+        preds = torch.argmax(logits, dim=1)
+        y_true = torch.argmax(targets, dim=1) if targets.ndim > 1 else targets
+
+        # 更新 metrics
+        self.train_acc.update(preds, y_true)
+        self.train_precision.update(preds, y_true)
+        self.train_recall.update(preds, y_true)
+        self.train_f1.update(preds, y_true)
+        self.train_confmat.update(preds, y_true)
+
+        # log
         self.log("train_loss", loss.item(), on_step=False, on_epoch=True)
+        self.log("train_acc", self.train_acc, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("train_precision", self.train_precision, on_step=False, on_epoch=True)
+        self.log("train_recall", self.train_recall, on_step=False, on_epoch=True)
+        self.log("train_f1", self.train_f1, on_step=False, on_epoch=True)
         return loss
+    
+    def validation_step(self, batch, batch_idx):
+        images, targets = batch
+
+        # 如果開啟 EMA，就用 EMA 模型做 forward
+        if self.cfg.ema:
+            logits = self.model_ema.module(images)
+        else:
+            logits = self.forward(images)
+
+        if isinstance(logits, tuple):  # 避免模型輸出 tuple
+            logits = logits[0]
+
+        loss = self.cfg.criterion(logits, targets)
+
+        # 預測類別
+        preds = torch.argmax(logits, dim=1)
+        y_true = torch.argmax(targets, dim=1) if targets.ndim > 1 else targets
+
+        # 更新 metrics
+        self.val_acc.update(preds, y_true)
+        self.precision.update(preds, y_true)
+        self.recall.update(preds, y_true)
+        self.f1.update(preds, y_true)
+        self.confmat.update(preds, y_true)
+
+        self.log("val_loss", loss, on_epoch=True, prog_bar=True)
+        return {"loss": loss.detach()}
 
     def on_after_backward(self):  # on_after_backward 在每次反向傳播(backward pass)之後被調用
         # self.awp = False (all condition)
@@ -232,55 +302,104 @@ class MyLightningModule(pl.LightningModule):
         if self.cfg.ema:
             self.model_ema.update(self.model)
 
-    def validation_step(self, batch, batch_nb):
-        images, targets = batch
-        # self.ema = False (all condition)
-        if self.cfg.ema:  # 如果在配置 cfg 中啟用了 ema(Exponential Moving Average），則使用 EMA 模型進行前向傳播
-            logits = self.model_ema.module(images)
-        else:  # here；否則使用本身的 forward
-            logits = self.forward(images)
+    # def validation_step(self, batch, batch_nb):
+    #     images, targets = batch
+    #     # self.ema = False (all condition)
+    #     if self.cfg.ema:  # 如果在配置 cfg 中啟用了 ema(Exponential Moving Average），則使用 EMA 模型進行前向傳播
+    #         logits = self.model_ema.module(images)
+    #     else:  # here；否則使用本身的 forward
+    #         logits = self.forward(images)
 
-        if isinstance(logits, tuple):  # 某些模型（尤其是多輸出或特別架構）在 forward 時會回傳 (logits, 其他資訊)。
-            logits = logits[0]  # 這裡若檢測到是 tuple，僅取第一個元素作為 logits，避免後續計算出現錯誤
+    #     if isinstance(logits, tuple):  # 某些模型（尤其是多輸出或特別架構）在 forward 時會回傳 (logits, 其他資訊)。
+    #         logits = logits[0]  # 這裡若檢測到是 tuple，僅取第一個元素作為 logits，避免後續計算出現錯誤
 
-        loss = self.cfg.criterion(logits, targets)  # logits 表示模型對於該類別的信心分數；在深度學習中，logits 通常指的是 模型最後一層尚未經過激活函式（如 sigmoid 或 softmax）處理的原始輸出。也就是說，logits 是一個未經歸一化的分數（通常是實數值，可正可負），代表模型對各類別或輸出維度的「信心值」。
-        preds = logits
-        # preds = logits.sigmoid()
-        output = OrderedDict( {
-            "targets": targets.detach(), 
-            "preds": preds.detach(), 
-            "loss": loss.detach()
-        })  # "targets"：存放真實標籤，即 targets.detach() 的結果、"preds"：存放模型的預測值，即 preds.detach() 的結果、"loss"：存放計算出的損失，即 loss.detach() 的結果
-        return output
+    #     loss = self.cfg.criterion(logits, targets)  # logits 表示模型對於該類別的信心分數；在深度學習中，logits 通常指的是 模型最後一層尚未經過激活函式（如 sigmoid 或 softmax）處理的原始輸出。也就是說，logits 是一個未經歸一化的分數（通常是實數值，可正可負），代表模型對各類別或輸出維度的「信心值」。
+    #     preds = logits
+    #     # preds = logits.sigmoid()
+    #     output = OrderedDict( {
+    #         "targets": targets.detach(), 
+    #         "preds": preds.detach(), 
+    #         "loss": loss.detach()
+    #     })  # "targets"：存放真實標籤，即 targets.detach() 的結果、"preds"：存放模型的預測值，即 preds.detach() 的結果、"loss"：存放計算出的損失，即 loss.detach() 的結果
+    #     return output
         '''
         # training_step 是用來處理每個訓練批次的邏輯，並且會對模型進行權重更新（如反向傳播和優化器步驟）。它還可能使用訓練時的數據增強方法（如 Mixup 和 AWP）。
         # validation_step 是用來處理每個驗證批次的邏輯，計算損失和預測結果，但不會進行權重更新。它的目的是評估模型的表現。
         '''
 
     # 紀錄 vaild 之後的 驗證損失(v_loss)和 評分指標(val_metric)
-    def validation_epoch_end(self, outputs):
-        d = dict()  # 建立字典 d：用來儲存本 epoch 的聚合結果
-        d["epoch"] = int(self.current_epoch)
-        d["v_loss"] = torch.stack([o["loss"] for o in outputs]).mean().item()
+    # def validation_epoch_end(self, outputs):
+    #     d = dict()  # 建立字典 d：用來儲存本 epoch 的聚合結果
+    #     d["epoch"] = int(self.current_epoch)
+    #     d["v_loss"] = torch.stack([o["loss"] for o in outputs]).mean().item()
 
-        targets = torch.cat([o["targets"] for o in outputs]).cpu()#.numpy()  # 將所有 targets 串接後移到 CPU
-        preds = torch.cat([o["preds"] for o in outputs]).cpu()#.numpy()  # 將所有 preds 串接後移到 CPU
+    #     targets = torch.cat([o["targets"] for o in outputs]).cpu()#.numpy()  # 將所有 targets 串接後移到 CPU
+    #     preds = torch.cat([o["preds"] for o in outputs]).cpu()#.numpy()  # 將所有 preds 串接後移到 CPU
         
-        # class rsna_sagittal_level_cl_spinal_v1、class rsna_sagittal_level_cl_nfn_v1 -> self.metric = MultiAUC(label_features=self.label_features).torch
-        # class rsna_sagittal_cl -> self.metric = None
-        if self.cfg.metric is None:  # 若沒有指定 metric，則用負平均損失作為評分。
-            score = -d['v_loss']
-        elif len(np.unique(targets)) == 1:  # 若數據不具變化（所有標籤相同），則評分設為 0。
-            score = 0
-        else:  # 否則，利用指定的 metric 函數計算評分。
-            # st()
-            score = self.cfg.metric(targets, preds)  # 計算 MultiAUC -> score 反映了模型在當前驗證批次中的預測質量
+    #     # class rsna_sagittal_level_cl_spinal_v1、class rsna_sagittal_level_cl_nfn_v1 -> self.metric = MultiAUC(label_features=self.label_features).torch
+    #     # class rsna_sagittal_cl -> self.metric = None
+    #     if self.cfg.metric is None:  # 若沒有指定 metric，則用負平均損失作為評分。
+    #         score = -d['v_loss']
+    #     elif len(np.unique(targets)) == 1:  # 若數據不具變化（所有標籤相同），則評分設為 0。
+    #         score = 0
+    #     else:  # 否則，利用指定的 metric 函數計算評分。
+    #         # st()
+    #         score = self.cfg.metric(targets, preds)  # 計算 MultiAUC -> score 反映了模型在當前驗證批次中的預測質量
 
-        d["val_metric"] = score
-        # self.save_every_epoch_val_preds = False (all condition)
-        if self.cfg.save_every_epoch_val_preds:
-            np.save(f'{self.cfg.output_path}/val_preds/fold{self.cfg.fold}/epoch{self.current_epoch}.npy', preds)
-        self.log_dict(d, prog_bar=True, sync_dist=True)
+    #     d["val_metric"] = score
+    #     # self.save_every_epoch_val_preds = False (all condition)
+    #     if self.cfg.save_every_epoch_val_preds:
+    #         np.save(f'{self.cfg.output_path}/val_preds/fold{self.cfg.fold}/epoch{self.current_epoch}.npy', preds)
+    #     self.log_dict(d, prog_bar=True, sync_dist=True)
+
+    def training_epoch_end(self, outputs):
+        acc = self.train_acc.compute()
+        prec = self.train_precision.compute()
+        rec = self.train_recall.compute()
+        f1 = self.train_f1.compute()
+        confmat = self.train_confmat.compute()
+        total_samples = confmat.sum().item()
+
+        # 直接用同樣的 key，不加 "_epoch"
+        self.log("train_acc", acc, prog_bar=True)
+        self.log("train_precision", prec)
+        self.log("train_recall", rec)
+        self.log("train_f1", f1)
+        self.log("train_total_samples", total_samples)
+
+        print(f"\n[Train] Confusion Matrix:\n{confmat.cpu().numpy()}")
+
+        # reset
+        self.train_acc.reset()
+        self.train_precision.reset()
+        self.train_recall.reset()
+        self.train_f1.reset()
+        self.train_confmat.reset()
+
+    def validation_epoch_end(self, outputs):
+        acc = self.val_acc.compute()
+        prec = self.precision.compute()
+        rec = self.recall.compute()
+        f1 = self.f1.compute()
+        confmat = self.confmat.compute()
+        total_samples = confmat.sum().item()
+
+        # log 到 progress bar / metrics.csv
+        self.log("val_acc", acc, prog_bar=True)
+        self.log("val_precision", prec, prog_bar=True)
+        self.log("val_recall", rec, prog_bar=True)
+        self.log("val_f1", f1, prog_bar=True)
+        self.log("val_total_samples", total_samples, prog_bar=True)
+
+        # 螢幕印出 confusion matrix
+        print(f"\n[Valid] Confusion Matrix:\n{confmat.cpu().numpy()}")
+
+        # 重置 metrics（避免累積到下一個 epoch）
+        self.val_acc.reset()
+        self.precision.reset()
+        self.recall.reset()
+        self.f1.reset()
+        self.confmat.reset()
 
     def configure_optimizers(self):  # configure_optimizers 主要影響反向傳播過程，並且只有在 訓練階段的反向傳播 中才會使用
         optimizer = get_optimizer(self.cfg)
@@ -293,10 +412,11 @@ class MyLightningModule(pl.LightningModule):
             "optimizer": optimizer,
             "lr_scheduler": {
                 "scheduler": get_scheduler(self.cfg, optimizer),
-                "monitor": 'val_metric',
+                "monitor": 'val_f1',  # ✅ 改成有 log 的指標
                 "frequency": 1
             }
         }
+
     
     '''
     # src/lighting/lightning_modules/scheduler_optimizer.py
