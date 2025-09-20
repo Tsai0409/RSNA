@@ -839,6 +839,7 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         self.fold = fold  # 我加
         self.label_features = cols
         self.num_classes = len(self.label_features)
+        self.task = "multiclass"
 
         self.model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
         
@@ -1101,6 +1102,7 @@ class rsna_axial_spinal_ResNet50V2(rsna_v1_ResNet50V2):
 
         self.label_features = cols
         self.num_classes = len(self.label_features)
+        self.task = "multiclass"
         
         # self.model_name = 'convnext_small.in12k_ft_in1k_384'
         # self.model = timm.create_model(self.model_name, pretrained=True, num_classes=self.num_classes,
@@ -1346,6 +1348,7 @@ class rsna_saggital_mil_spinal_ResNet50V2(rsna_v1_ResNet50V2):
             'spinal_canal_stenosis_severe',
         ]
         self.num_classes = len(self.label_features)
+        self.task = "multiclass"
         # self.model_name = 'convnext_small.in12k_ft_in1k_384'
         # base_model = timm.create_model(self.model_name, pretrained=True, num_classes=1, drop_rate=self.drop_rate, drop_path_rate=self.drop_path_rate)  # 自動只用 timm 下載的對應模型權重
         # self.model = RSNA2ndModel(base_model=base_model, num_classes=len(self.label_features), pool='avg', swin=False)
@@ -1710,6 +1713,7 @@ class rsna_saggital_mil_ss_ResNet50V2(rsna_v1_ResNet50V2):
         print(l, len(self.train_df))
 
         self.num_classes = len(self.label_features)
+        self.task = "multiclass"
         # self.model_name = 'convnext_small.in12k_ft_in1k_384'
         # base_model = timm.create_model(self.model_name, pretrained=True, num_classes=1, drop_rate=self.drop_rate, drop_path_rate=self.drop_path_rate)
         # self.model = RSNA2ndModel(base_model=base_model, num_classes=len(self.label_features), pool='avg', swin=False)
@@ -2108,6 +2112,7 @@ class rsna_saggital_mil_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         print(l, len(self.train_df))
 
         self.num_classes = len(self.label_features)
+        self.task = "multiclass"
         # self.model_name = 'convnext_small.in12k_ft_in1k_384'
         # base_model = timm.create_model(self.model_name, pretrained=True, num_classes=1, drop_rate=self.drop_rate, drop_path_rate=self.drop_path_rate)
         # self.model = RSNA2ndModel(base_model=base_model, num_classes=len(self.label_features), pool='avg', swin=False)
