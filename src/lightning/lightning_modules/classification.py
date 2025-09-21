@@ -500,24 +500,25 @@ class MyLightningModule(pl.LightningModule):
         # =============================
         if self.task == "binary":
             self.val_acc = Accuracy(task="binary")
-            self.precision = Precision(task="binary")
-            self.recall = Recall(task="binary")
-            self.f1 = F1Score(task="binary")
-            self.confmat = ConfusionMatrix(task="binary")
+            self.val_precision = Precision(task="binary")
+            self.val_recall = Recall(task="binary")
+            self.val_f1 = F1Score(task="binary")
+            self.val_confmat = ConfusionMatrix(task="binary")
 
         elif self.task == "multiclass":
             self.val_acc = Accuracy(task="multiclass", num_classes=self.num_classes, average="macro")
-            self.precision = Precision(task="multiclass", num_classes=self.num_classes, average="macro")
-            self.recall = Recall(task="multiclass", num_classes=self.num_classes, average="macro")
-            self.f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="macro")
-            self.confmat = ConfusionMatrix(task="multiclass", num_classes=self.num_classes)
+            self.val_precision = Precision(task="multiclass", num_classes=self.num_classes, average="macro")
+            self.val_recall = Recall(task="multiclass", num_classes=self.num_classes, average="macro")
+            self.val_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="macro")
+            self.val_confmat = ConfusionMatrix(task="multiclass", num_classes=self.num_classes)
 
         elif self.task == "multilabel":
             self.val_acc = Accuracy(task="multilabel", num_labels=self.num_labels, average="macro")
-            self.precision = Precision(task="multilabel", num_labels=self.num_labels, average="macro")
-            self.recall = Recall(task="multilabel", num_labels=self.num_labels, average="macro")
-            self.f1 = F1Score(task="multilabel", num_labels=self.num_labels, average="macro")
-            self.confmat = None  # ❌ 不支援 multilabel confusion matrix
+            self.val_precision = Precision(task="multilabel", num_labels=self.num_labels, average="macro")
+            self.val_recall = Recall(task="multilabel", num_labels=self.num_labels, average="macro")
+            self.val_f1 = F1Score(task="multilabel", num_labels=self.num_labels, average="macro")
+            self.val_confmat = None  # ❌ 不支援 multilabel confusion matrix
+
 
     def forward(self, x):
         return self.model(x)
@@ -563,11 +564,12 @@ class MyLightningModule(pl.LightningModule):
 
         # 更新 metrics
         self.val_acc.update(preds, y_true)
-        self.precision.update(preds, y_true)
-        self.recall.update(preds, y_true)
-        self.f1.update(preds, y_true)
-        if self.confmat:
-            self.confmat.update(preds, y_true)
+        self.val_precision.update(preds, y_true)
+        self.val_recall.update(preds, y_true)
+        self.val_f1.update(preds, y_true)
+        if self.val_confmat:
+            self.val_confmat.update(preds, y_true)
+
 
         self.log("val_loss", loss, on_epoch=True, prog_bar=True)
         return {"loss": loss.detach()}
@@ -598,24 +600,25 @@ class MyLightningModule(pl.LightningModule):
 
     def validation_epoch_end(self, outputs):
         acc = self.val_acc.compute()
-        prec = self.precision.compute()
-        rec = self.recall.compute()
-        f1 = self.f1.compute()
+        prec = self.val_precision.compute()
+        rec = self.val_recall.compute()
+        f1 = self.val_f1.compute()
 
         self.log("val_acc", acc, prog_bar=True)
         self.log("val_precision", prec, prog_bar=True)
         self.log("val_recall", rec, prog_bar=True)
         self.log("val_f1", f1, prog_bar=True)
 
-        if self.confmat:
-            confmat = self.confmat.compute()
+        if self.val_confmat:
+            confmat = self.val_confmat.compute()
             print(f"\n[Valid] Confusion Matrix:\n{confmat.cpu().numpy()}")
-            self.confmat.reset()
+            self.val_confmat.reset()
 
         self.val_acc.reset()
-        self.precision.reset()
-        self.recall.reset()
-        self.f1.reset()
+        self.val_precision.reset()
+        self.val_recall.reset()
+        self.val_f1.reset()
+
 
     # =============================
     # Optimizer
