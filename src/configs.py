@@ -2178,3 +2178,354 @@ class rsna_saggital_mil_nfn_ResNet50V2(rsna_v1_ResNet50V2):
             self.train_df = self.train_df[~self.train_df[col].isnull()]
             self.valid_df = self.valid_df[~self.valid_df[col].isnull()]
         print(f'Before label NaN filtering: {l}, After: {len(self.train_df)}')
+
+
+
+# rsna_axial_spinal_model.py
+import math
+import os
+import copy
+import time
+from typing import Optional, Sequence, Dict, Any
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.cuda.amp import autocast, GradScaler
+
+import timm
+from sklearn.metrics import f1_score, roc_auc_score
+import numpy as np
+
+
+# -------------------------
+# FocalLoss (Multiclass) with class weights
+# -------------------------
+class FocalLoss_axial_spinal(nn.Module):
+    def __init__(self, alpha: Optional[Sequence[float]] = None,
+                 gamma: float = 2.0, reduction: str = 'mean'):
+        """
+        alpha: None / float / list[float] (len=C). 類別權重，處理不平衡
+        gamma: focusing parameter
+        reduction: 'mean' | 'sum' | 'none'
+        """
+        super().__init__()
+        if isinstance(alpha, (list, tuple, np.ndarray)):
+            self.alpha = torch.tensor(alpha, dtype=torch.float32)
+        elif isinstance(alpha, (float, int)):
+            self.alpha = torch.tensor([float(alpha)], dtype=torch.float32)
+        else:
+            self.alpha = None
+        self.gamma = gamma
+        self.reduction = reduction
+
+    def forward(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        """
+        logits: [N, C]
+        targets: [N] (long, e.g., 0..C-1)
+        """
+        ce = F.cross_entropy(logits, targets, reduction='none')
+        pt = torch.exp(-ce)  # predicted prob of the true class
+
+        if self.alpha is not None:
+            if self.alpha.numel() == 1:
+                at = self.alpha.to(logits.device)
+            else:
+                at = self.alpha.to(logits.device)[targets]
+        else:
+            at = 1.0
+
+        loss = at * (1.0 - pt).pow(self.gamma) * ce
+
+        if self.reduction == 'mean':
+            return loss.mean()
+        elif self.reduction == 'sum':
+            return loss.sum()
+        else:
+            return loss
+
+
+# -------------------------
+# Metrics
+# -------------------------
+def macro_f1(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    return f1_score(y_true, y_pred, average='macro')
+
+
+def macro_auc_ovo(y_true: np.ndarray, y_proba: np.ndarray) -> float:
+    """
+    y_true: [N] int
+    y_proba: [N, C] probabilities
+    """
+    # 若某些類別在 y_true 沒出現，roc_auc_score 可能會報錯，這裡保護一下
+    labels = np.unique(y_true)
+    if labels.size < 2:
+        return float('nan')
+    try:
+        return roc_auc_score(y_true, y_proba, average='macro', multi_class='ovo')
+    except Exception:
+        return float('nan')
+
+
+# -------------------------
+# Baseline (簡化成訓練用基底)
+# -------------------------
+class Baseline_ResNet50V2_axial_spinal:
+    def __init__(self):
+        # 這些是常用設定，留著讓子類覆寫
+        self.gpu = 'v100'
+        self.batch_size = 16
+        self.grad_accumulations = 1
+        self.lr = 1e-4
+        self.epochs = 20
+        self.seed = 2023
+        self.model_name = 'convnext_small.fb_in22k_ft_in1k_384'
+        self.num_classes = 3
+        self.fp16 = True
+        self.optimizer_name = 'adamw'
+        self.scheduler_name = 'CosineAnnealingWarmRestarts'
+        self.eta_min = 5e-7
+        self.t_max = 30
+        self.use_wandb = True
+
+        # 由子類建立：
+        self.model: nn.Module = None
+        self.criterion: nn.Module = None
+
+        # 早停
+        self.early_stop_patience = 5  # 連續 5 個 epoch val 沒進步就停
+        self.early_stop_mode = 'max'  # 以 macro-F1 為準：越大越好
+        self.best_ckpt_path = 'best_model.pth'
+
+        # metric
+        self.monitor_metric_name = 'macro_f1'  # or 'macro_auc'
+        self.history: Dict[str, list] = {'train_loss': [], 'val_loss': [],
+                                         'val_macro_f1': [], 'val_macro_auc': []}
+
+    # ----- 組件 -----
+    def build_model(self):
+        self.model = timm.create_model(
+            self.model_name, pretrained=True, num_classes=self.num_classes
+        )
+
+    def build_criterion(self, alpha=None, gamma=2.0):
+        self.criterion = FocalLoss_axial_spinal(alpha=alpha, gamma=gamma, reduction='mean')
+
+    def build_optimizer(self, lr=None):
+        if lr is None:
+            lr = self.lr
+        if self.optimizer_name.lower() == 'adamw':
+            return torch.optim.AdamW(self.model.parameters(), lr=lr)
+        elif self.optimizer_name.lower() == 'adam':
+            return torch.optim.Adam(self.model.parameters(), lr=lr)
+        else:
+            raise ValueError(f'Unknown optimizer: {self.optimizer_name}')
+
+    def build_scheduler(self, optimizer):
+        if self.scheduler_name == 'CosineAnnealingWarmRestarts':
+            return torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+                optimizer, T_0=self.t_max, eta_min=self.eta_min
+            )
+        elif self.scheduler_name == 'CosineAnnealingLR':
+            return torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer, T_max=self.t_max, eta_min=self.eta_min
+            )
+        else:
+            return None
+
+    # ----- 訓練與驗證 -----
+    @torch.no_grad()
+    def _evaluate(self, loader, device) -> Dict[str, Any]:
+        self.model.eval()
+        loss_meter = 0.0
+        n = 0
+
+        all_probs = []
+        all_preds = []
+        all_tgts = []
+
+        for images, targets in loader:
+            images = images.to(device, non_blocking=True)
+            targets = targets.to(device, non_blocking=True)
+
+            logits = self.model(images)
+            loss = self.criterion(logits, targets)
+
+            probs = torch.softmax(logits, dim=1)
+            preds = probs.argmax(dim=1)
+
+            bs = images.size(0)
+            loss_meter += loss.item() * bs
+            n += bs
+
+            all_probs.append(probs.detach().cpu())
+            all_preds.append(preds.detach().cpu())
+            all_tgts.append(targets.detach().cpu())
+
+        all_probs = torch.cat(all_probs).numpy()
+        all_preds = torch.cat(all_preds).numpy()
+        all_tgts = torch.cat(all_tgts).numpy()
+
+        val_loss = loss_meter / max(1, n)
+        val_f1 = macro_f1(all_tgts, all_preds)
+        val_auc = macro_auc_ovo(all_tgts, all_probs)
+
+        return {'val_loss': val_loss, 'val_macro_f1': val_f1, 'val_macro_auc': val_auc}
+
+    def _improve(self, current: float, best: Optional[float]) -> bool:
+        if best is None:
+            return True
+        if self.early_stop_mode == 'max':
+            return current > best
+        else:
+            return current < best
+
+    def fit(self, train_loader, val_loader=None, device: Optional[torch.device] = None):
+        if device is None:
+            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+        self.model.to(device)
+        optimizer = self.build_optimizer(self.lr)
+        scheduler = self.build_scheduler(optimizer)
+        scaler = GradScaler(enabled=self.fp16)
+
+        best_metric = None
+        best_state = None
+        patience_left = self.early_stop_patience
+
+        for epoch in range(1, self.epochs + 1):
+            self.model.train()
+            start_t = time.time()
+
+            running_loss = 0.0
+            n = 0
+            optimizer.zero_grad(set_to_none=True)
+
+            for step, (images, targets) in enumerate(train_loader):
+                images = images.to(device, non_blocking=True)
+                targets = targets.to(device, non_blocking=True)
+
+                with autocast(enabled=self.fp16):
+                    logits = self.model(images)
+                    loss = self.criterion(logits, targets)
+                    loss = loss / max(1, self.grad_accumulations)
+
+                scaler.scale(loss).backward()
+
+                if (step + 1) % self.grad_accumulations == 0:
+                    scaler.step(optimizer)
+                    scaler.update()
+                    optimizer.zero_grad(set_to_none=True)
+
+                bs = images.size(0)
+                running_loss += loss.item() * bs * max(1, self.grad_accumulations)
+                n += bs
+
+            if scheduler is not None:
+                # 使用 WarmRestarts 時，通常每個 epoch step 一次就好
+                if hasattr(scheduler, 'step'):
+                    scheduler.step(epoch - 1 + step / max(1, len(train_loader)))
+
+            train_loss = running_loss / max(1, n)
+            self.history['train_loss'].append(train_loss)
+
+            # 驗證
+            if val_loader is not None:
+                eval_res = self._evaluate(val_loader, device)
+                self.history['val_loss'].append(eval_res['val_loss'])
+                self.history['val_macro_f1'].append(eval_res['val_macro_f1'])
+                self.history['val_macro_auc'].append(eval_res['val_macro_auc'])
+
+                # 監控指標
+                monitor_value = eval_res['val_macro_f1'] if self.monitor_metric_name == 'macro_f1' else eval_res['val_macro_auc']
+
+                improved = self._improve(monitor_value, best_metric)
+                if improved:
+                    best_metric = monitor_value
+                    best_state = copy.deepcopy(self.model.state_dict())
+                    patience_left = self.early_stop_patience
+                    # 存檔（可選）
+                    if self.best_ckpt_path:
+                        torch.save({'model': best_state,
+                                    'epoch': epoch,
+                                    'monitor': monitor_value}, self.best_ckpt_path)
+                else:
+                    patience_left -= 1
+
+                print(f"[Epoch {epoch:03d}/{self.epochs}] "
+                      f"train_loss={train_loss:.4f} | "
+                      f"val_loss={eval_res['val_loss']:.4f} | "
+                      f"macroF1={eval_res['val_macro_f1']:.4f} | "
+                      f"macroAUC={eval_res['val_macro_auc']:.4f} | "
+                      f"best={best_metric if best_metric is not None else float('nan'):.4f} | "
+                      f"patience_left={patience_left}")
+            else:
+                print(f"[Epoch {epoch:03d}/{self.epochs}] train_loss={train_loss:.4f}")
+
+            # 早停
+            if val_loader is not None and patience_left <= 0:
+                print("Early stopping triggered.")
+                break
+
+            dur = time.time() - start_t
+            # 你可以在這裡加上 wandb.log(...) 等
+
+        # 載回最佳權重
+        if best_state is not None:
+            self.model.load_state_dict(best_state)
+
+        return self.history
+
+
+# -------------------------
+# RSNA Axial Spinal Model
+# -------------------------
+class rsna_axial_spinal_ResNet50V2_axial_spinal(Baseline_ResNet50V2_axial_spinal):
+    def __init__(self,
+                 alpha: Optional[Sequence[float]] = None,
+                 gamma: float = 2.0,
+                 lr: float = 5.5e-5,
+                 epochs: int = 20,
+                 patience: int = 5,
+                 model_name: str = 'convnext_small.fb_in22k_ft_in1k_384',
+                 num_classes: int = 3,
+                 monitor: str = 'macro_f1'):
+        """
+        alpha: 類別權重（建議依據樣本數倒數設定，如 [1.0, 3.0, 3.0]）
+        gamma: focal loss gamma
+        lr: 學習率
+        epochs: 訓練回合數（你要求的 20）
+        patience: 早停耐心（例如 5）
+        monitor: 'macro_f1' or 'macro_auc'
+        """
+        super().__init__()
+        self.lr = lr
+        self.epochs = epochs
+        self.early_stop_patience = patience
+        self.monitor_metric_name = monitor
+        self.model_name = model_name
+        self.num_classes = num_classes
+
+        # 建模型 & loss
+        self.build_model()
+        self.build_criterion(alpha=alpha, gamma=gamma)
+
+        # 其他建議設定
+        self.grad_accumulations = 2 if lr <= 6e-5 else 1  # 小 batch 時稍微累積
+        self.fp16 = True
+        self.optimizer_name = 'adamw'
+        self.scheduler_name = 'CosineAnnealingWarmRestarts'
+        self.t_max = 30
+        self.eta_min = 5e-7
+
+    @staticmethod
+    def suggest_alpha_from_counts(class_counts: Sequence[int]) -> Sequence[float]:
+        """
+        依據各類樣本數給出建議 alpha（倒數 + 正規化）
+        e.g. counts=[n0,n1,n2] -> alpha \propto 1/count
+        """
+        counts = np.array(class_counts, dtype=float)
+        counts[counts == 0] = counts[counts > 0].min()  # 避免除 0
+        inv = 1.0 / counts
+        alpha = inv / inv.mean()
+        return alpha.tolist()
