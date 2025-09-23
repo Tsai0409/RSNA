@@ -2529,3 +2529,9 @@ class rsna_axial_spinal_ResNet50V2_axial_spinal(Baseline_ResNet50V2_axial_spinal
         inv = 1.0 / counts
         alpha = inv / inv.mean()
         return alpha.tolist()
+
+
+# 相容舊程式碼
+# FocalLoss = FocalLoss_axial_spinal
+# Baseline_ResNet50V2 = Baseline_ResNet50V2_axial_spinal
+# rsna_axial_spinal_ResNet50V2 = rsna_axial_spinal_ResNet50V2_axial_spinal
