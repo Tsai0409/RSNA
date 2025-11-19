@@ -561,7 +561,9 @@ class MyLightningModule(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         images, targets = batch
         logits = self.forward(images)
-        loss = self.cfg.criterion(logits, targets)
+        # loss = self.cfg.criterion(logits, targets)
+        loss = self.criterion(logits, targets)
+
 
         preds, y_true = self._get_preds_targets(logits, targets)
 
