@@ -732,6 +732,30 @@ class MultiLabelFocalLoss(nn.Module):
         else:
             return focal_loss
 
+class MultiClassFocalLoss(nn.Module):
+    def __init__(self, gamma=2.0, alpha=None, reduction='mean'):
+        super().__init__()
+        self.gamma = gamma
+        self.alpha = alpha
+        self.reduction = reduction
+
+    def forward(self, logits, targets):
+        """
+        logits: [B, C]
+        targets: [B] with class indices (0,1,2)
+        """
+        ce_loss = F.cross_entropy(logits, targets, reduction='none')
+        pt = torch.exp(-ce_loss)
+
+        if self.alpha is not None:
+            alpha_factor = self.alpha[targets]
+            focal_loss = alpha_factor * (1 - pt) ** self.gamma * ce_loss
+        else:
+            focal_loss = (1 - pt) ** self.gamma * ce_loss
+
+        if self.reduction == 'mean':
+            return focal_loss.mean()
+        return focal_loss.sum()
 
 class Baseline_ResNet50V2:
     def __init__(self):
@@ -848,7 +872,7 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         self.lr = 5.5e-5
         self.epochs = 10
         self.transform = medical_v4
-        self.criterion = MultiLabelFocalLoss()
+        self.criterion = MultiClassFocalLoss()
 
         self.box_crop = True
         self.box_crop_x_ratio = 1
@@ -1115,6 +1139,7 @@ class rsna_axial_spinal_ResNet50V2(rsna_v1_ResNet50V2):
         self.lr = 1e-4  # 5.5e-5
         self.epochs = 20  # 10
         self.transform = medical_v3
+        self.criterion = MultiClassFocalLoss()
 
         self.drop_rate = 0.2  # 0.1
         self.drop_path_rate = 0.0
