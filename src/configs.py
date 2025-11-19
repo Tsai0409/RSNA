@@ -1155,7 +1155,7 @@ class rsna_axial_spinal_ResNet50V2(rsna_v1_ResNet50V2):
         self.box_crop_x_ratio = 1  # 2
         self.box_crop_y_ratio = 2  # 6
 
-        self._build_dataframes_center()
+        # self._build_dataframes_center()
 
     # def _build_dataframes_center(self):
     #     valid_df = pd.read_csv(self.train_df_path)
