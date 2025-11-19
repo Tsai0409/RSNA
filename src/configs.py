@@ -739,18 +739,19 @@ class MultiClassFocalLoss(nn.Module):
         self.reduction = reduction
 
         if alpha is not None:
-            # 這行極重要！這行才會讓 alpha 跟著模型一起移到 GPU
             self.register_buffer("alpha", alpha)
         else:
             self.alpha = None
 
     def forward(self, logits, targets):
-        print(">>> USING FOCAL:", id(self), "alpha:", self.alpha.device, "targets:", targets.device)
+        # 👉 debug print 放這裡！
+        print(">>> alpha device:", self.alpha.device, 
+              "| targets device:", targets.device)
+
         ce_loss = F.cross_entropy(logits, targets, reduction='none')
         pt = torch.exp(-ce_loss)
 
         if self.alpha is not None:
-            # alpha 現在一定在同一個 device 上，因此不會報錯
             alpha_factor = self.alpha[targets]
             focal_loss = alpha_factor * (1 - pt) ** self.gamma * ce_loss
         else:
