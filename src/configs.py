@@ -744,9 +744,11 @@ class MultiClassFocalLoss(nn.Module):
             self.alpha = None
 
     def forward(self, logits, targets):
-        # 👉 debug print 放這裡！
+        targets = targets.long()   # ★★★ 加這一行
+
         print(">>> alpha device:", self.alpha.device, 
-              "| targets device:", targets.device)
+            "| targets device:", targets.device,
+            "| targets dtype:", targets.dtype)
 
         ce_loss = F.cross_entropy(logits, targets, reduction='none')
         pt = torch.exp(-ce_loss)
@@ -760,6 +762,7 @@ class MultiClassFocalLoss(nn.Module):
         if self.reduction == 'mean':
             return focal_loss.mean()
         return focal_loss.sum()
+
 
 
 class Baseline_ResNet50V2:
