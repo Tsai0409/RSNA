@@ -1112,11 +1112,11 @@ class rsna_axial_spinal_ResNet50V2(rsna_v1_ResNet50V2):
         self.image_size = 224  # 384
         self.batch_size = 8
         self.grad_accumulations = 2
-        self.lr = 5.5e-5
-        self.epochs = 10
+        self.lr = 1e-4  # 5.5e-5
+        self.epochs = 20  # 10
         self.transform = medical_v3
 
-        self.drop_rate = 0.0
+        self.drop_rate = 0.2  # 0.1
         self.drop_path_rate = 0.0
         
         self.metric = None
@@ -1132,34 +1132,34 @@ class rsna_axial_spinal_ResNet50V2(rsna_v1_ResNet50V2):
 
         self._build_dataframes_center()
 
-    def _build_dataframes_center(self):
-        valid_df = pd.read_csv(self.train_df_path)
-        valid_df['level'] = valid_df.pred_level.map({
-            1: 'l1_l2',
-            2: 'l2_l3',
-            3: 'l3_l4',
-            4: 'l4_l5',
-            5: 'l5_s1',
-        })
-        valid_df['study_level'] = valid_df.study_id.astype(str) + '_' + valid_df.level.str.replace('/', '_').str.lower()
-        valid_df['left_right'] = 'center'  # 中央對稱
+    # def _build_dataframes_center(self):
+    #     valid_df = pd.read_csv(self.train_df_path)
+    #     valid_df['level'] = valid_df.pred_level.map({
+    #         1: 'l1_l2',
+    #         2: 'l2_l3',
+    #         3: 'l3_l4',
+    #         4: 'l4_l5',
+    #         5: 'l5_s1',
+    #     })
+    #     valid_df['study_level'] = valid_df.study_id.astype(str) + '_' + valid_df.level.str.replace('/', '_').str.lower()
+    #     valid_df['left_right'] = 'center'  # 中央對稱
 
-        # valid 資料：全部保留
-        self.valid_df = valid_df.copy()
+    #     # valid 資料：全部保留
+    #     self.valid_df = valid_df.copy()
 
-        # train 資料：過濾 noisy
-        noise_df = pd.read_csv(
-            f'{WORKING_DIR}/csv_train/noise_reduction_by_oof_holdout_9/noisy_target_level_th09_holdout.csv'
-        )
-        noise_df = noise_df[noise_df.target == 'spinal_canal_stenosis']
-        noisy_study_levels = set(noise_df.study_level)
-        self.train_df = valid_df[~valid_df.study_level.isin(noisy_study_levels)].reset_index(drop=True)
+    #     # train 資料：過濾 noisy
+    #     noise_df = pd.read_csv(
+    #         f'{WORKING_DIR}/csv_train/noise_reduction_by_oof_holdout_9/noisy_target_level_th09_holdout.csv'
+    #     )
+    #     noise_df = noise_df[noise_df.target == 'spinal_canal_stenosis']
+    #     noisy_study_levels = set(noise_df.study_level)
+    #     self.train_df = valid_df[~valid_df.study_level.isin(noisy_study_levels)].reset_index(drop=True)
 
-        cols = [
-            'spinal_canal_stenosis_normal',
-            'spinal_canal_stenosis_moderate',
-            'spinal_canal_stenosis_severe',
-        ]
+    #     cols = [
+    #         'spinal_canal_stenosis_normal',
+    #         'spinal_canal_stenosis_moderate',
+    #         'spinal_canal_stenosis_severe',
+    #     ]
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -1313,7 +1313,7 @@ class rsna_v1_ResNet50V2(Baseline_ResNet50V2):
         self.predict_valid = True
         self.predict_test = False
         self.predict_train = False
-        self.model_name = 'convnext_small.in12k_ft_in1k_384'
+        # self.model_name = 'convnext_small.in12k_ft_in1k_384'
         self.transform = medical_v3  # 定義在：src/utils/augmentations/augmentation.py
         self.batch_size = 8
         self.lr = 1e-5

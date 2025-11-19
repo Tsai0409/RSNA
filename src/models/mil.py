@@ -1,4 +1,4 @@
-# models/mil.py
+# src/models/mil.py
 
 import torch
 import torch.nn as nn
