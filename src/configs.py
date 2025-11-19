@@ -744,9 +744,8 @@ class MultiClassFocalLoss(nn.Module):
         else:
             self.alpha = None
 
-        print(">>> USING FOCAL:", id(self), "alpha:", self.alpha.device, "targets:", targets.device)
-
     def forward(self, logits, targets):
+        print(">>> USING FOCAL:", id(self), "alpha:", self.alpha.device, "targets:", targets.device)
         ce_loss = F.cross_entropy(logits, targets, reduction='none')
         pt = torch.exp(-ce_loss)
 
