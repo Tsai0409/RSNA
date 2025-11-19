@@ -460,6 +460,8 @@ class MyLightningModule(pl.LightningModule):
     def __init__(self, cfg):
         super().__init__()
         self.model = cfg.model
+        self.criterion = cfg.criterion
+
         self.cfg = cfg
 
         # 判斷任務類型
@@ -530,7 +532,8 @@ class MyLightningModule(pl.LightningModule):
         images, targets = batch
         logits = self.forward(images)
 
-        loss = self.cfg.criterion(logits, targets)
+        # loss = self.cfg.criterion(logits, targets) 
+        loss = self.criterion(logits, targets)
 
         # 預測處理
         preds, y_true = self._get_preds_targets(logits, targets)
