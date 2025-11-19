@@ -754,10 +754,10 @@ class MultiClassFocalLoss(nn.Module):
         targets = targets.long()     # 保證 cross entropy 能用
         # ---------------------------
 
-        print(">>> alpha device:", self.alpha.device,
-            "| targets device:", targets.device,
-            "| targets dtype:", targets.dtype,
-            "| targets shape:", targets.shape)
+        # print(">>> alpha device:", self.alpha.device,
+        #     "| targets device:", targets.device,
+        #     "| targets dtype:", targets.dtype,
+        #     "| targets shape:", targets.shape)
 
         ce_loss = F.cross_entropy(logits, targets, reduction='none')
         pt = torch.exp(-ce_loss)
