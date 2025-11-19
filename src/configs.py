@@ -744,11 +744,20 @@ class MultiClassFocalLoss(nn.Module):
             self.alpha = None
 
     def forward(self, logits, targets):
-        targets = targets.long()   # ★★★ 加這一行
 
-        print(">>> alpha device:", self.alpha.device, 
+        # ---------------------------
+        # ⭐ 這兩行是關鍵：處理 one-hot or multi-hot
+        # ---------------------------
+        if targets.ndim > 1:
+            targets = torch.argmax(targets, dim=1)
+
+        targets = targets.long()     # 保證 cross entropy 能用
+        # ---------------------------
+
+        print(">>> alpha device:", self.alpha.device,
             "| targets device:", targets.device,
-            "| targets dtype:", targets.dtype)
+            "| targets dtype:", targets.dtype,
+            "| targets shape:", targets.shape)
 
         ce_loss = F.cross_entropy(logits, targets, reduction='none')
         pt = torch.exp(-ce_loss)
@@ -762,6 +771,7 @@ class MultiClassFocalLoss(nn.Module):
         if self.reduction == 'mean':
             return focal_loss.mean()
         return focal_loss.sum()
+
 
 
 
