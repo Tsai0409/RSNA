@@ -848,6 +848,18 @@ class rsna_v1_ResNet50V2(Baseline_ResNet50V2):
         self.p_rand_order_v1 = 0
 
 class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
+    def calculate_loss(self, logits, targets):
+        nfn_logits = logits[:, :3]
+        ss_logits  = logits[:, 3:]
+
+        nfn_target = targets[:, 0]
+        ss_target  = targets[:, 1]
+
+        loss_nfn = self.criterion_nfn(nfn_logits, nfn_target)
+        loss_ss  = self.criterion_ss(ss_logits, ss_target)
+
+        return loss_nfn + loss_ss
+
     def __init__(self, fold=0):
         super().__init__()
         cols = []
@@ -872,7 +884,14 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         self.lr = 5.5e-5
         self.epochs = 10
         self.transform = medical_v4
-        self.criterion = MultiClassFocalLoss()
+
+         # ========= Focal Loss α 設定（你計算的值） =========
+        self.alpha_nfn = torch.tensor([0.04, 0.33, 0.63]).float()
+        self.alpha_ss  = torch.tensor([0.05, 0.30, 0.65]).float()
+
+        # ====== Two Loss Functions ======
+        self.criterion_nfn = MultiClassFocalLoss(gamma=2.0, alpha=self.alpha_nfn)
+        self.criterion_ss  = MultiClassFocalLoss(gamma=2.0, alpha=self.alpha_ss)
 
         self.box_crop = True
         self.box_crop_x_ratio = 1
@@ -1139,7 +1158,8 @@ class rsna_axial_spinal_ResNet50V2(rsna_v1_ResNet50V2):
         self.lr = 1e-4  # 5.5e-5
         self.epochs = 20  # 10
         self.transform = medical_v3
-        self.criterion = MultiClassFocalLoss()
+        alpha = torch.tensor([0.032, 0.375, 0.593])   # Normal, Moderate, Severe -> axial_spinal
+        self.criterion = MultiClassFocalLoss(gamma=2.0, alpha=alpha)
 
         self.drop_rate = 0.2  # 0.1
         self.drop_path_rate = 0.0
@@ -1155,36 +1175,36 @@ class rsna_axial_spinal_ResNet50V2(rsna_v1_ResNet50V2):
         self.box_crop_x_ratio = 1  # 2
         self.box_crop_y_ratio = 2  # 6
 
-        # self._build_dataframes_center()
+        self._build_dataframes_center()
 
-    # def _build_dataframes_center(self):
-    #     valid_df = pd.read_csv(self.train_df_path)
-    #     valid_df['level'] = valid_df.pred_level.map({
-    #         1: 'l1_l2',
-    #         2: 'l2_l3',
-    #         3: 'l3_l4',
-    #         4: 'l4_l5',
-    #         5: 'l5_s1',
-    #     })
-    #     valid_df['study_level'] = valid_df.study_id.astype(str) + '_' + valid_df.level.str.replace('/', '_').str.lower()
-    #     valid_df['left_right'] = 'center'  # 中央對稱
+    def _build_dataframes_center(self):
+        valid_df = pd.read_csv(self.train_df_path)
+        valid_df['level'] = valid_df.pred_level.map({
+            1: 'l1_l2',
+            2: 'l2_l3',
+            3: 'l3_l4',
+            4: 'l4_l5',
+            5: 'l5_s1',
+        })
+        valid_df['study_level'] = valid_df.study_id.astype(str) + '_' + valid_df.level.str.replace('/', '_').str.lower()
+        valid_df['left_right'] = 'center'  # 中央對稱
 
-    #     # valid 資料：全部保留
-    #     self.valid_df = valid_df.copy()
+        # valid 資料：全部保留
+        self.valid_df = valid_df.copy()
 
-    #     # train 資料：過濾 noisy
-    #     noise_df = pd.read_csv(
-    #         f'{WORKING_DIR}/csv_train/noise_reduction_by_oof_holdout_9/noisy_target_level_th09_holdout.csv'
-    #     )
-    #     noise_df = noise_df[noise_df.target == 'spinal_canal_stenosis']
-    #     noisy_study_levels = set(noise_df.study_level)
-    #     self.train_df = valid_df[~valid_df.study_level.isin(noisy_study_levels)].reset_index(drop=True)
+        # train 資料：過濾 noisy
+        noise_df = pd.read_csv(
+            f'{WORKING_DIR}/csv_train/noise_reduction_by_oof_holdout_9/noisy_target_level_th09_holdout.csv'
+        )
+        noise_df = noise_df[noise_df.target == 'spinal_canal_stenosis']
+        noisy_study_levels = set(noise_df.study_level)
+        self.train_df = valid_df[~valid_df.study_level.isin(noisy_study_levels)].reset_index(drop=True)
 
-    #     cols = [
-    #         'spinal_canal_stenosis_normal',
-    #         'spinal_canal_stenosis_moderate',
-    #         'spinal_canal_stenosis_severe',
-    #     ]
+        cols = [
+            'spinal_canal_stenosis_normal',
+            'spinal_canal_stenosis_moderate',
+            'spinal_canal_stenosis_severe',
+        ]
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
