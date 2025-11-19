@@ -739,21 +739,17 @@ class MultiClassFocalLoss(nn.Module):
         self.reduction = reduction
 
         if alpha is not None:
-            # alpha is a CPU tensor originally → register_buffer allows auto-moving to GPU
+            # 這行極重要！這行才會讓 alpha 跟著模型一起移到 GPU
             self.register_buffer("alpha", alpha)
         else:
             self.alpha = None
 
     def forward(self, logits, targets):
-        """
-        logits: [B, C]
-        targets: [B] with class indices (0,1,2)
-        """
         ce_loss = F.cross_entropy(logits, targets, reduction='none')
         pt = torch.exp(-ce_loss)
 
         if self.alpha is not None:
-            # alpha is guaranteed to be on the same device now
+            # alpha 現在一定在同一個 device 上，因此不會報錯
             alpha_factor = self.alpha[targets]
             focal_loss = alpha_factor * (1 - pt) ** self.gamma * ce_loss
         else:
@@ -762,6 +758,7 @@ class MultiClassFocalLoss(nn.Module):
         if self.reduction == 'mean':
             return focal_loss.mean()
         return focal_loss.sum()
+
 
 class Baseline_ResNet50V2:
     def __init__(self):
