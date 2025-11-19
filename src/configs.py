@@ -736,8 +736,13 @@ class MultiClassFocalLoss(nn.Module):
     def __init__(self, gamma=2.0, alpha=None, reduction='mean'):
         super().__init__()
         self.gamma = gamma
-        self.alpha = alpha
         self.reduction = reduction
+
+        if alpha is not None:
+            # alpha is a CPU tensor originally → register_buffer allows auto-moving to GPU
+            self.register_buffer("alpha", alpha)
+        else:
+            self.alpha = None
 
     def forward(self, logits, targets):
         """
@@ -748,6 +753,7 @@ class MultiClassFocalLoss(nn.Module):
         pt = torch.exp(-ce_loss)
 
         if self.alpha is not None:
+            # alpha is guaranteed to be on the same device now
             alpha_factor = self.alpha[targets]
             focal_loss = alpha_factor * (1 - pt) ** self.gamma * ce_loss
         else:
