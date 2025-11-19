@@ -1163,6 +1163,7 @@ class rsna_axial_spinal_ResNet50V2(rsna_v1_ResNet50V2):
         self.transform = medical_v3
         alpha = torch.tensor([0.032, 0.375, 0.593])   # Normal, Moderate, Severe -> axial_spinal
         self.criterion = MultiClassFocalLoss(gamma=2.0, alpha=alpha)
+        self.add_module("criterion_module", self.criterion)
 
         self.drop_rate = 0.2  # 0.1
         self.drop_path_rate = 0.0

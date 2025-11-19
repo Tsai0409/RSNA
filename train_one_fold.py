@@ -12,6 +12,7 @@ from pytorch_lightning.strategies import DDPStrategy
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
 from pytorch_lightning.loggers.csv_logs import CSVLogger
 from pytorch_lightning.callbacks import TQDMProgressBar
+from src.configs import MultiClassFocalLoss
 
 # 建立進度條 callback，refresh_rate 控制每 N 個 step 更新一次
 progress_bar = TQDMProgressBar(refresh_rate=20)
