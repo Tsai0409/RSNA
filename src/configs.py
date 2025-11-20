@@ -1796,7 +1796,7 @@ class rsna_saggital_mil_ss_ResNet50V2(rsna_v1_ResNet50V2):
         self.epochs = 20  # 10  # 6
         self.batch_size = 16
         self.grad_accumulations = 1
-        self.use_sagittal_mil_dataset = True
+        self.use_sagittal_mil_dataset = False  # True
 
         alpha = torch.tensor([0.081, 0.303, 0.616])   # Normal, Moderate, Severe -> axial_spinal -> fix
         self.criterion = MultiClassFocalLoss(gamma=2.0, alpha=alpha)
@@ -2197,7 +2197,7 @@ class rsna_saggital_mil_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         self.image_size = 228  # 160
         self.batch_size = 16
         self.grad_accumulations = 1
-        self.use_sagittal_mil_dataset = True
+        self.use_sagittal_mil_dataset = False  # True
         self.ch_3_crop = True
         alpha = torch.tensor([0.040, 0.173, 0.787])   # Normal, Moderate, Severe -> axial_spinal -> fix
         self.criterion = MultiClassFocalLoss(gamma=2.0, alpha=alpha)
