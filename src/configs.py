@@ -1416,19 +1416,22 @@ class rsna_saggital_mil_spinal_ResNet50V2(rsna_v1_ResNet50V2):
         # base_model = timm.create_model(self.model_name, pretrained=True, num_classes=1, drop_rate=self.drop_rate, drop_path_rate=self.drop_path_rate)  # 自動只用 timm 下載的對應模型權重
         # self.model = RSNA2ndModel(base_model=base_model, num_classes=len(self.label_features), pool='avg', swin=False)
         # self.model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
-        base_model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
-        self.model = SagittalMILModel(base_model, num_classes=self.num_classes, pooling="attention")
+        # base_model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
+        # self.model = SagittalMILModel(base_model, num_classes=self.num_classes, pooling="attention")
+        self.model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
         
         self.metric = None
         self.memo = ''
-        self.lr = 5.5e-5
+        self.lr = 1e-4  # 5.5e-5
         self.rsna_2024_agg_val = False
-        self.epochs = 10  # 4
+        self.epochs = 20  # 10  # 4
         self.image_size = 228  # 128
         self.batch_size = 16
         self.grad_accumulations = 1
+        alpha = torch.tensor([0.031, 0.371, 0.598])   # Normal, Moderate, Severe -> axial_spinal -> fix
+        self.criterion = MultiClassFocalLoss(gamma=2.0, alpha=alpha)
 
-        self.drop_rate = 0.0
+        self.drop_rate = 0.2  # 0.0
         self.drop_path_rate = 0.0
         
         self.use_sagittal_mil_dataset = True
@@ -1781,20 +1784,24 @@ class rsna_saggital_mil_ss_ResNet50V2(rsna_v1_ResNet50V2):
         # base_model = timm.create_model(self.model_name, pretrained=True, num_classes=1, drop_rate=self.drop_rate, drop_path_rate=self.drop_path_rate)
         # self.model = RSNA2ndModel(base_model=base_model, num_classes=len(self.label_features), pool='avg', swin=False)
         # self.model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
-        base_model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
-        self.model = SagittalMILModel(base_model, num_classes=self.num_classes, pooling="attention")
+        # base_model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
+        # self.model = SagittalMILModel(base_model, num_classes=self.num_classes, pooling="attention")
+        self.model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
 
         # self.metric = MultiAUC(label_features=self.label_features).torch
         self.metric = None
         self.memo = ''
-        self.lr = 5.5e-5
+        self.lr = 1e-4  # 5e-5
         self.rsna_2024_agg_val = False
-        self.epochs = 10  # 6
+        self.epochs = 20  # 10  # 6
         self.batch_size = 16
         self.grad_accumulations = 1
         self.use_sagittal_mil_dataset = True
+
+        alpha = torch.tensor([0.081, 0.303, 0.616])   # Normal, Moderate, Severe -> axial_spinal -> fix
+        self.criterion = MultiClassFocalLoss(gamma=2.0, alpha=alpha)
         
-        self.drop_rate = 0.0
+        self.drop_rate = 0.2  # 0.0
         self.drop_path_rate = 0.0
         
         self.box_crop = True
@@ -2185,15 +2192,18 @@ class rsna_saggital_mil_nfn_ResNet50V2(rsna_v1_ResNet50V2):
 
         self.metric = None
         self.memo = ''
-        self.lr = 5.5e-5
+        self.lr = 1e-4  # 5.5e-5
         self.rsna_2024_agg_val = False
-        self.epochs = 10  # 6
+        self.epochs = 20  # 10  # 6
         self.image_size = 228  # 160
         self.batch_size = 16
         self.grad_accumulations = 1
         self.use_sagittal_mil_dataset = True
         self.ch_3_crop = True
-        self.drop_rate = 0.0
+        alpha = torch.tensor([0.040, 0.173, 0.787])   # Normal, Moderate, Severe -> axial_spinal -> fix
+        self.criterion = MultiClassFocalLoss(gamma=2.0, alpha=alpha)
+        
+        self.drop_rate = 0.2  # 0.0
         self.drop_path_rate = 0.0
 
         self.box_crop = True
