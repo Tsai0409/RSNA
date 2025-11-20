@@ -2187,8 +2187,7 @@ class rsna_saggital_mil_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         # base_model = timm.create_model(self.model_name, pretrained=True, num_classes=1, drop_rate=self.drop_rate, drop_path_rate=self.drop_path_rate)
         # self.model = RSNA2ndModel(base_model=base_model, num_classes=len(self.label_features), pool='avg', swin=False)
         # self.model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
-        base_model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
-        self.model = SagittalMILModel(base_model, num_classes=self.num_classes, pooling="attention")
+        self.model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
 
         self.metric = None
         self.memo = ''
