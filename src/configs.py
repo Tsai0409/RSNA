@@ -1434,7 +1434,7 @@ class rsna_saggital_mil_spinal_ResNet50V2(rsna_v1_ResNet50V2):
         self.drop_rate = 0.2  # 0.0
         self.drop_path_rate = 0.0
         
-        self.use_sagittal_mil_dataset = True
+        self.use_sagittal_mil_dataset = False  # True
         self.box_crop = True
         self.box_crop_x_ratio = 1  # 1
         self.box_crop_y_ratio = 1  # 0.5
