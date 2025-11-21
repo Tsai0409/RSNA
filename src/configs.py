@@ -873,9 +873,9 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
     Each: Normal, Moderate, Severe → 3 classes
     Total outputs: 6 logits
     """
-
     def __init__(self, fold=0):
         super().__init__()
+        self.is_axial_ss_nfn = True   # <--- 加這行
 
         # --------------------------
         # Dataset label config
