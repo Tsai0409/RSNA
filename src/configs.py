@@ -866,20 +866,9 @@ class rsna_v1_ResNet50V2(Baseline_ResNet50V2):
         self.p_rand_order_v1 = 0
 
 class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
-    def calculate_loss(self, logits, targets):
-        nfn_logits = logits[:, :3]
-        ss_logits  = logits[:, 3:]
-
-        nfn_target = targets[:, 0]
-        ss_target  = targets[:, 1]
-
-        loss_nfn = self.criterion_nfn(nfn_logits, nfn_target)
-        loss_ss  = self.criterion_ss(ss_logits, ss_target)
-
-        return loss_nfn + loss_ss
-
     def __init__(self, fold=0):
         super().__init__()
+        
         cols = []
         label_features = [
             'neural_foraminal_narrowing',
@@ -890,28 +879,34 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
             cols.append(f'{col}_moderate')
             cols.append(f'{col}_severe')
 
-        self.fold = fold  # 我加
+        self.fold = fold
         self.label_features = cols
         self.num_classes = len(self.label_features)
         self.task = "multiclass"
         
         self.image_size = 224
         self.batch_size = 8
-        self.lr = 1e-4  # 5.5e-5
-        self.epochs = 20  # 10
+        self.lr = 1e-4
+        self.epochs = 20
         self.transform = medical_v4
 
-         # ========= Focal Loss α 設定（你計算的值） =========
+        # -----------------------------
+        # FIRST define the two loss functions
+        # -----------------------------
         self.alpha_nfn = torch.tensor([0.04, 0.33, 0.63]).float()
         self.alpha_ss  = torch.tensor([0.05, 0.30, 0.65]).float()
 
-        # ====== Two Loss Functions ======
         self.criterion_nfn = MultiClassFocalLoss(gamma=2.0, alpha=self.alpha_nfn)
         self.criterion_ss  = MultiClassFocalLoss(gamma=2.0, alpha=self.alpha_ss)
 
-        # self.model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
+        # -----------------------------
+        # NEXT define backbone
+        # -----------------------------
         base = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
 
+        # -----------------------------
+        # LAST: construct wrapper (now lr & loss already exist)
+        # -----------------------------
         self.model = AxialSSNFNWrapper(
             base_model=base,
             lr=self.lr,
@@ -919,11 +914,12 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
             criterion_ss=self.criterion_ss,
         )
 
+        # the rest configs
         self.box_crop = True
         self.box_crop_x_ratio = 1
         self.box_crop_y_ratio = 2
         self.center_pad_ratio = 0
-        self.image_width_ratio = 1  # 👈 保留這個，之後 _build_dataframes 用得到
+        self.image_width_ratio = 1
 
         self.drop_rate = 0.0
         self.drop_path_rate = 0.0
@@ -938,6 +934,7 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         
         self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_holdout_7/axial_classification_holdout.csv'
         self._build_dataframes()
+
 
     def _build_dataframes(self):
         # ----- 共用欄位處理 -----
