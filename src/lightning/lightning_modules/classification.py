@@ -641,6 +641,7 @@ class MyLightningModule(pl.LightningModule):
         self.log("val_recall", rec, prog_bar=True)
         self.log("val_f1", f1, prog_bar=True)
 
+        # ---- 原本的 confusion matrix ----
         if self.val_confmat:
             confmat = self.val_confmat.compute()
             print(f"\n[Valid] Confusion Matrix:\n{confmat.cpu().numpy()}")
@@ -660,25 +661,26 @@ class MyLightningModule(pl.LightningModule):
             logits = torch.cat(self.val_logits, dim=0)
             targets = torch.cat(self.val_targets, dim=0)
 
-            # 拆成 multi-task
+            # Multi-task split
             nfn_logits = logits[:, :3]
             ss_logits  = logits[:, 3:]
 
-            nfn_true = targets[:, 0]
-            ss_true  = targets[:, 1]
+            # ---- 重要：確保是 long()，才能拿來當 indexing ----
+            nfn_true = targets[:, 0].long()
+            ss_true  = targets[:, 1].long()
 
-            nfn_pred = nfn_logits.argmax(dim=1)
-            ss_pred  = ss_logits.argmax(dim=1)
+            nfn_pred = nfn_logits.argmax(dim=1).long()
+            ss_pred  = ss_logits.argmax(dim=1).long()
 
             # NFN ConfMat
             cm_nfn = torch.zeros(3, 3, dtype=torch.int64)
             for t, p in zip(nfn_true, nfn_pred):
-                cm_nfn[t, p] += 1
+                cm_nfn[int(t), int(p)] += 1
 
             # SS ConfMat
             cm_ss = torch.zeros(3, 3, dtype=torch.int64)
             for t, p in zip(ss_true, ss_pred):
-                cm_ss[t, p] += 1
+                cm_ss[int(t), int(p)] += 1
 
             print("[NFN Confusion Matrix 3x3]")
             print(cm_nfn.numpy())
@@ -686,12 +688,11 @@ class MyLightningModule(pl.LightningModule):
             print("\n[SS Confusion Matrix 3x3]")
             print(cm_ss.numpy())
 
+            # 清除 buffer
             self.val_logits.clear()
             self.val_targets.clear()
 
             return
-
-
 
 
     # =============================
