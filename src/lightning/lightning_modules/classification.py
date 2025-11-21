@@ -565,30 +565,45 @@ class MyLightningModule(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         images, targets = batch
         logits = self.forward(images)
+
+        # =============================
+        # Normal single-head loss
+        # =============================
         loss = self.criterion(logits, targets)
 
+        # =============================
+        # Normal metrics (original behavior)
+        # =============================
         preds, y_true = self._get_preds_targets(logits, targets)
 
-        # 更新 metrics
         self.val_acc.update(preds, y_true)
         self.val_precision.update(preds, y_true)
         self.val_recall.update(preds, y_true)
         self.val_f1.update(preds, y_true)
+
         if self.val_confmat:
             self.val_confmat.update(preds, y_true)
 
-        # -----------------------------------------
-        # Extra collection for axial_ss_nfn multi-task model
-        # -----------------------------------------
+        # =============================
+        # Multi-task special handling
+        # =============================
         if hasattr(self.cfg, "is_axial_ss_nfn") and self.cfg.is_axial_ss_nfn:
+
+            # create buffer once
             if not hasattr(self, "val_logits"):
                 self.val_logits = []
                 self.val_targets = []
+
+            # store logits + targets for later use
             self.val_logits.append(logits.detach().cpu())
             self.val_targets.append(targets.detach().cpu())
 
+        # =============================
+        # Logging
+        # =============================
         self.log("val_loss", loss, on_epoch=True, prog_bar=True)
         return {"loss": loss.detach()}
+
 
 
     # =============================
