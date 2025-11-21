@@ -590,19 +590,23 @@ class MyLightningModule(pl.LightningModule):
             loss_ss  = F.cross_entropy(ss_logits, ss_targets)
             loss = loss_nfn + loss_ss
 
-            # --- store for multi-task confusion matrix ---
-            if not hasattr(self, "val_logits"):
-                self.val_logits = []
-                self.val_targets = []
+            # ------------ store each head separately -----------
+            if not hasattr(self, "val_nfn_logits"):
+                self.val_nfn_logits = []
+                self.val_ss_logits = []
+                self.val_nfn_trues = []
+                self.val_ss_trues = []
 
-            self.val_logits.append(logits)       # logits = (nfn, ss)
-            self.val_targets.append(targets)
+            self.val_nfn_logits.append(nfn_logits.detach().cpu())
+            self.val_ss_logits.append(ss_logits.detach().cpu())
+            self.val_nfn_trues.append(nfn_targets.cpu())
+            self.val_ss_trues.append(ss_targets.cpu())
 
             self.log("val_loss", loss, on_epoch=True, prog_bar=True)
             return {"loss": loss.detach()}
 
         # ====================================================
-        # Normal single-head behavior for ALL OTHER MODELS
+        # Normal single-head behavior
         # ====================================================
         loss = self.criterion(logits, targets)
 
@@ -617,8 +621,6 @@ class MyLightningModule(pl.LightningModule):
 
         self.log("val_loss", loss, on_epoch=True, prog_bar=True)
         return {"loss": loss.detach()}
-
-
 
     # =============================
     # End of epoch
@@ -645,6 +647,7 @@ class MyLightningModule(pl.LightningModule):
         self.train_f1.reset()
 
     def validation_epoch_end(self, outputs):
+        # Normal metric logging
         acc = self.val_acc.compute()
         prec = self.val_precision.compute()
         rec = self.val_recall.compute()
@@ -655,7 +658,6 @@ class MyLightningModule(pl.LightningModule):
         self.log("val_recall", rec, prog_bar=True)
         self.log("val_f1", f1, prog_bar=True)
 
-        # ---- 原本的 confusion matrix ----
         if self.val_confmat:
             confmat = self.val_confmat.compute()
             print(f"\n[Valid] Confusion Matrix:\n{confmat.cpu().numpy()}")
@@ -666,35 +668,30 @@ class MyLightningModule(pl.LightningModule):
         self.val_recall.reset()
         self.val_f1.reset()
 
-        # ============================================================
-        #  Extra evaluation for axial_ss_nfn multi-task model
-        # ============================================================
+        # ====================================================
+        # Multi-task confusion matrix output
+        # ====================================================
         if hasattr(self.cfg, "is_axial_ss_nfn") and self.cfg.is_axial_ss_nfn:
+
             print("\n========== Multi-task Confusion Matrices ==========\n")
 
-            logits = torch.cat(self.val_logits, dim=0)
-            targets = torch.cat(self.val_targets, dim=0)
+            # concat all
+            nfn_logits = torch.cat(self.val_nfn_logits, dim=0)
+            ss_logits  = torch.cat(self.val_ss_logits, dim=0)
+            nfn_true   = torch.cat(self.val_nfn_trues, dim=0)
+            ss_true    = torch.cat(self.val_ss_trues, dim=0)
 
-            # Multi-task split
-            nfn_logits = logits[:, :3]
-            ss_logits  = logits[:, 3:]
+            nfn_pred = nfn_logits.argmax(dim=1)
+            ss_pred  = ss_logits.argmax(dim=1)
 
-            # ---- 重要：確保是 long()，才能拿來當 indexing ----
-            nfn_true = targets[:, 0].long()
-            ss_true  = targets[:, 1].long()
-
-            nfn_pred = nfn_logits.argmax(dim=1).long()
-            ss_pred  = ss_logits.argmax(dim=1).long()
-
-            # NFN ConfMat
             cm_nfn = torch.zeros(3, 3, dtype=torch.int64)
-            for t, p in zip(nfn_true, nfn_pred):
-                cm_nfn[int(t), int(p)] += 1
+            cm_ss  = torch.zeros(3, 3, dtype=torch.int64)
 
-            # SS ConfMat
-            cm_ss = torch.zeros(3, 3, dtype=torch.int64)
+            for t, p in zip(nfn_true, nfn_pred):
+                cm_nfn[t, p] += 1
+
             for t, p in zip(ss_true, ss_pred):
-                cm_ss[int(t), int(p)] += 1
+                cm_ss[t, p] += 1
 
             print("[NFN Confusion Matrix 3x3]")
             print(cm_nfn.numpy())
@@ -702,11 +699,12 @@ class MyLightningModule(pl.LightningModule):
             print("\n[SS Confusion Matrix 3x3]")
             print(cm_ss.numpy())
 
-            # 清除 buffer
-            self.val_logits.clear()
-            self.val_targets.clear()
+            # clear caches
+            self.val_nfn_logits.clear()
+            self.val_ss_logits.clear()
+            self.val_nfn_trues.clear()
+            self.val_ss_trues.clear()
 
-            return
 
 
     # =============================
