@@ -868,6 +868,19 @@ class rsna_v1_ResNet50V2(Baseline_ResNet50V2):
 
 from torchmetrics import ConfusionMatrix
 class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
+    def training_step(self, batch, batch_idx):
+        images, targets = batch
+
+        logits = self(images)
+
+        # multi-task loss
+        loss = self.calculate_loss(logits, targets)
+
+        self.log("train_loss", loss, prog_bar=True, on_step=True, on_epoch=True)
+
+        return loss
+
+    
     def validation_epoch_end(self, outputs):
         # -----------------------------
         # 單獨處理 multi-task 評估
