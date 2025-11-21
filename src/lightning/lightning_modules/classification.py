@@ -536,13 +536,31 @@ class MyLightningModule(pl.LightningModule):
         images, targets = batch
         logits = self.forward(images)
 
-        # loss = self.cfg.criterion(logits, targets) 
+        # ====================================================
+        # Multi-task NFN + SS loss (ONLY for axial_ss_nfn)
+        # ====================================================
+        if hasattr(self.cfg, "is_axial_ss_nfn") and self.cfg.is_axial_ss_nfn:
+            nfn_logits, ss_logits = logits     # ← ★ tuple 拆開
+            nfn_targets = targets[:, 0].long()
+            ss_targets  = targets[:, 1].long()
+
+            loss_nfn = F.cross_entropy(nfn_logits, nfn_targets)
+            loss_ss  = F.cross_entropy(ss_logits, ss_targets)
+            loss = loss_nfn + loss_ss
+
+            self.log("train_loss", loss, on_step=False, on_epoch=True)
+            self.log("train_loss_nfn", loss_nfn, on_epoch=True)
+            self.log("train_loss_ss",  loss_ss,  on_epoch=True)
+
+            return loss
+
+        # ====================================================
+        # Normal single-head behavior for ALL OTHER MODELS
+        # ====================================================
         loss = self.criterion(logits, targets)
 
-        # 預測處理
         preds, y_true = self._get_preds_targets(logits, targets)
 
-        # 更新 metrics
         self.train_acc.update(preds, y_true)
         self.train_precision.update(preds, y_true)
         self.train_recall.update(preds, y_true)
@@ -550,13 +568,7 @@ class MyLightningModule(pl.LightningModule):
         if self.train_confmat:
             self.train_confmat.update(preds, y_true)
 
-        # log
         self.log("train_loss", loss, on_step=False, on_epoch=True)
-        self.log("train_acc", self.train_acc, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("train_precision", self.train_precision, on_step=False, on_epoch=True)
-        self.log("train_recall", self.train_recall, on_step=False, on_epoch=True)
-        self.log("train_f1", self.train_f1, on_step=False, on_epoch=True)
-
         return loss
 
     # =============================
@@ -566,41 +578,43 @@ class MyLightningModule(pl.LightningModule):
         images, targets = batch
         logits = self.forward(images)
 
-        # =============================
-        # Normal single-head loss
-        # =============================
+        # ====================================================
+        # Multi-task NFN + SS loss (ONLY for axial_ss_nfn)
+        # ====================================================
+        if hasattr(self.cfg, "is_axial_ss_nfn") and self.cfg.is_axial_ss_nfn:
+            nfn_logits, ss_logits = logits
+            nfn_targets = targets[:, 0].long()
+            ss_targets  = targets[:, 1].long()
+
+            loss_nfn = F.cross_entropy(nfn_logits, nfn_targets)
+            loss_ss  = F.cross_entropy(ss_logits, ss_targets)
+            loss = loss_nfn + loss_ss
+
+            # --- store for multi-task confusion matrix ---
+            if not hasattr(self, "val_logits"):
+                self.val_logits = []
+                self.val_targets = []
+
+            self.val_logits.append(logits)       # logits = (nfn, ss)
+            self.val_targets.append(targets)
+
+            self.log("val_loss", loss, on_epoch=True, prog_bar=True)
+            return {"loss": loss.detach()}
+
+        # ====================================================
+        # Normal single-head behavior for ALL OTHER MODELS
+        # ====================================================
         loss = self.criterion(logits, targets)
 
-        # =============================
-        # Normal metrics (original behavior)
-        # =============================
         preds, y_true = self._get_preds_targets(logits, targets)
 
         self.val_acc.update(preds, y_true)
         self.val_precision.update(preds, y_true)
         self.val_recall.update(preds, y_true)
         self.val_f1.update(preds, y_true)
-
         if self.val_confmat:
             self.val_confmat.update(preds, y_true)
 
-        # =============================
-        # Multi-task special handling
-        # =============================
-        if hasattr(self.cfg, "is_axial_ss_nfn") and self.cfg.is_axial_ss_nfn:
-
-            # create buffer once
-            if not hasattr(self, "val_logits"):
-                self.val_logits = []
-                self.val_targets = []
-
-            # store logits + targets for later use
-            self.val_logits.append(logits.detach().cpu())
-            self.val_targets.append(targets.detach().cpu())
-
-        # =============================
-        # Logging
-        # =============================
         self.log("val_loss", loss, on_epoch=True, prog_bar=True)
         return {"loss": loss.detach()}
 
