@@ -865,7 +865,44 @@ class rsna_v1_ResNet50V2(Baseline_ResNet50V2):
         self.grad_accumulations = 2
         self.p_rand_order_v1 = 0
 
+
+from torchmetrics import ConfusionMatrix
 class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
+    def validation_epoch_end(self, outputs):
+        # -----------------------------
+        # 單獨處理 multi-task 評估
+        # -----------------------------
+
+        # NFN
+        nfn_preds = torch.cat(self.val_nfn_preds)
+        nfn_trues = torch.cat(self.val_nfn_trues)
+        cm_nfn = self.cm_nfn(nfn_preds, nfn_trues)
+
+        # SS
+        ss_preds = torch.cat(self.val_ss_preds)
+        ss_trues = torch.cat(self.val_ss_trues)
+        cm_ss = self.cm_ss(ss_preds, ss_trues)
+
+        print("\n========== VALIDATION (NFN / SS) ==========")
+
+        print("\n[VALID] NFN Confusion Matrix (3x3):")
+        print(cm_nfn.cpu().numpy())
+
+        print("\n[VALID] SS Confusion Matrix (3x3):")
+        print(cm_ss.cpu().numpy())
+
+        print("============================================\n")
+
+        # 清空 buffer（下一 epoch 重新收集）
+        self.val_nfn_preds.clear()
+        self.val_nfn_trues.clear()
+        self.val_ss_preds.clear()
+        self.val_ss_trues.clear()
+
+        # 若你仍想 log 標準 metrics，可加：
+        # self.log("nfn_acc", (nfn_preds == nfn_trues).float().mean())
+        # self.log("ss_acc",  (ss_preds == ss_trues).float().mean())
+
     def calculate_loss(self, logits, targets):
         nfn_logits = logits[:, :3]
         ss_logits  = logits[:, 3:]
@@ -880,6 +917,20 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
 
     def __init__(self, fold=0):
         super().__init__()
+        
+        # ========== ADD THESE ==========
+        # buffers for collecting predictions
+        self.val_nfn_preds = []
+        self.val_nfn_trues = []
+        self.val_ss_preds  = []
+        self.val_ss_trues  = []
+
+        # confusion matrices (per-task)
+        self.cm_nfn = ConfusionMatrix(num_classes=3)
+        self.cm_ss  = ConfusionMatrix(num_classes=3)
+        # =================================
+
+
         cols = []
         label_features = [
             'neural_foraminal_narrowing',
