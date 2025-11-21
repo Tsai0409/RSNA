@@ -866,7 +866,7 @@ class rsna_v1_ResNet50V2(Baseline_ResNet50V2):
         self.p_rand_order_v1 = 0
 
 
-from torchmetrics import ConfusionMatrix
+from torchmetrics.classification import MulticlassConfusionMatrix
 class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
     def training_step(self, batch, batch_idx):
         images, targets = batch
@@ -965,8 +965,10 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         self.val_ss_trues  = []
 
         # confusion matrices (per-task)
-        self.cm_nfn = ConfusionMatrix(num_classes=3)
-        self.cm_ss  = ConfusionMatrix(num_classes=3)
+        # self.cm_nfn = ConfusionMatrix(num_classes=3)
+        # self.cm_ss  = ConfusionMatrix(num_classes=3)
+        self.cm_nfn = MulticlassConfusionMatrix(num_classes=3)
+        self.cm_ss  = MulticlassConfusionMatrix(num_classes=3)
         # =================================
 
 
