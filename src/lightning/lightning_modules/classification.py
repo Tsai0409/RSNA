@@ -535,17 +535,19 @@ class MyLightningModule(pl.LightningModule):
     # =============================
     def training_step(self, batch, batch_idx):
         images, targets = batch
-        logits = self.model(images)   # << 永遠回 Tensor
+
+        # 統一經過 forward，再抽 logits Tensor
+        out = self(images)                  # 等於 self.forward(images)
+        logits = self._extract_logits(out)  # out 可能是 Tensor 或 (Tensor, something)
 
         # -------------------------------
         # special case: axial_ss_nfn
-        # -> 使用 wrapper 自己的 loss，不跑 6-class metrics
+        # -> 使用兩個 head 的 loss，不跑 6-class metrics
         # -------------------------------
         if getattr(self.cfg, "is_axial_ss_nfn", False):
-
-            # logits: (B, 6)
+            # logits: (B, 6), targets: (B, 2) 其中 [:,0] = NFN label, [:,1] = SS label
             loss_nfn = self.cfg.criterion_nfn(logits[:, :3], targets[:, 0])
-            loss_ss  = self.cfg.criterion_ss(logits[:, 3:], targets[:, 1])
+            loss_ss  = self.cfg.criterion_ss (logits[:, 3:], targets[:, 1])
             loss = loss_nfn + loss_ss
 
             self.log("train_loss", loss, on_step=False, on_epoch=True)
@@ -579,23 +581,24 @@ class MyLightningModule(pl.LightningModule):
     # =============================
     def validation_step(self, batch, batch_idx):
         images, targets = batch
-        logits = self.model(images)
+
+        out = self(images)
+        logits = self._extract_logits(out)
 
         # -------------------------------
-        # axial_ss_nfn：不要跑 6-class metrics
+        # axial_ss_nfn：不跑 6-class metrics，只算 multi-task loss & 收 logits/targets
         # -------------------------------
         if getattr(self.cfg, "is_axial_ss_nfn", False):
-
             loss_nfn = self.cfg.criterion_nfn(logits[:, :3], targets[:, 0])
-            loss_ss  = self.cfg.criterion_ss(logits[:, 3:], targets[:, 1])
+            loss_ss  = self.cfg.criterion_ss (logits[:, 3:], targets[:, 1])
             loss = loss_nfn + loss_ss
 
             if not hasattr(self, "val_logits"):
                 self.val_logits = []
                 self.val_targets = []
 
-            self.val_logits.append(logits.detach().cpu())     # (B, 6)
-            self.val_targets.append(targets.detach().cpu())   # (B, 2)
+            self.val_logits.append(logits.detach().cpu())    # (B, 6)
+            self.val_targets.append(targets.detach().cpu())  # (B, 2)
 
             self.log("val_loss", loss, on_epoch=True, prog_bar=True)
             return {"loss": loss.detach()}
@@ -623,7 +626,7 @@ class MyLightningModule(pl.LightningModule):
     # =============================
     def training_epoch_end(self, outputs):
 
-        # axial_ss_nfn：不需要 6-class metrics
+        # axial_ss_nfn：不需要 6-class metrics，因為我們根本沒在更新它
         if getattr(self.cfg, "is_axial_ss_nfn", False):
             return
 
@@ -655,7 +658,7 @@ class MyLightningModule(pl.LightningModule):
     def validation_epoch_end(self, outputs):
 
         # ------------------------------------------------
-        # 非 axial_ss_nfn → 走 6-class 原本流程
+        # 非 axial_ss_nfn → 走原本 6-class metrics 邏輯
         # ------------------------------------------------
         if not getattr(self.cfg, "is_axial_ss_nfn", False):
 
@@ -678,16 +681,15 @@ class MyLightningModule(pl.LightningModule):
             self.val_precision.reset()
             self.val_recall.reset()
             self.val_f1.reset()
-
             return
 
         # ------------------------------------------------
-        # axial_ss_nfn → multi-task 3x3 + 3x3 混淆矩陣
+        # axial_ss_nfn → multi-task NFN / SS 混淆矩陣
         # ------------------------------------------------
         print("\n========== Multi-task Confusion Matrices ==========\n")
 
-        logits = torch.cat(self.val_logits, dim=0)
-        targets = torch.cat(self.val_targets, dim=0)
+        logits = torch.cat(self.val_logits, dim=0)   # (N, 6)
+        targets = torch.cat(self.val_targets, dim=0) # (N, 2)
 
         nfn_logits = logits[:, :3]
         ss_logits  = logits[:, 3:]
@@ -715,6 +717,7 @@ class MyLightningModule(pl.LightningModule):
 
         self.val_logits.clear()
         self.val_targets.clear()
+
 
 
 
