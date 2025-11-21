@@ -38,7 +38,7 @@ from src.models.model_with_arcface import ArcMarginProduct, AddMarginProduct, Ar
 from src.models.with_meta_models import WithMetaModel
 from src.models.resnet50v2_fpn import ResNet50V2FPN  # multiscale model
 from src.models.mil import SagittalMILModel  # multiscale model
-
+from src.models.axial_ss_nfn_wrapper import AxialSSNFNWrapper
 
 from src.utils.augmentations.strong_aug import *
 from src.utils.augmentations.augmentation import *
@@ -865,57 +865,7 @@ class rsna_v1_ResNet50V2(Baseline_ResNet50V2):
         self.grad_accumulations = 2
         self.p_rand_order_v1 = 0
 
-
-from torchmetrics.classification import MulticlassConfusionMatrix
 class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
-    def training_step(self, batch, batch_idx):
-        images, targets = batch
-
-        logits = self(images)
-
-        # multi-task loss
-        loss = self.calculate_loss(logits, targets)
-
-        self.log("train_loss", loss, prog_bar=True, on_step=True, on_epoch=True)
-
-        return loss
-
-    
-    def validation_epoch_end(self, outputs):
-        # -----------------------------
-        # 單獨處理 multi-task 評估
-        # -----------------------------
-
-        # NFN
-        nfn_preds = torch.cat(self.val_nfn_preds)
-        nfn_trues = torch.cat(self.val_nfn_trues)
-        cm_nfn = self.cm_nfn(nfn_preds, nfn_trues)
-
-        # SS
-        ss_preds = torch.cat(self.val_ss_preds)
-        ss_trues = torch.cat(self.val_ss_trues)
-        cm_ss = self.cm_ss(ss_preds, ss_trues)
-
-        print("\n========== VALIDATION (NFN / SS) ==========")
-
-        print("\n[VALID] NFN Confusion Matrix (3x3):")
-        print(cm_nfn.cpu().numpy())
-
-        print("\n[VALID] SS Confusion Matrix (3x3):")
-        print(cm_ss.cpu().numpy())
-
-        print("============================================\n")
-
-        # 清空 buffer（下一 epoch 重新收集）
-        self.val_nfn_preds.clear()
-        self.val_nfn_trues.clear()
-        self.val_ss_preds.clear()
-        self.val_ss_trues.clear()
-
-        # 若你仍想 log 標準 metrics，可加：
-        # self.log("nfn_acc", (nfn_preds == nfn_trues).float().mean())
-        # self.log("ss_acc",  (ss_preds == ss_trues).float().mean())
-
     def calculate_loss(self, logits, targets):
         nfn_logits = logits[:, :3]
         ss_logits  = logits[:, 3:]
@@ -927,51 +877,9 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         loss_ss  = self.criterion_ss(ss_logits, ss_target)
 
         return loss_nfn + loss_ss
-    
-    def validation_step(self, batch, batch_idx):
-        images, targets = batch
-
-        logits = self(images)
-
-        # 分頭 logits
-        nfn_logits = logits[:, :3]
-        ss_logits  = logits[:, 3:]
-
-        # 預測
-        nfn_pred = torch.argmax(nfn_logits, dim=1)
-        ss_pred  = torch.argmax(ss_logits,  dim=1)
-
-        # Ground truth
-        nfn_true = targets[:, 0]
-        ss_true  = targets[:, 1]
-
-        # 收集（放 CPU，避免 GPU 累積記憶體爆炸）
-        self.val_nfn_preds.append(nfn_pred.detach().cpu())
-        self.val_nfn_trues.append(nfn_true.detach().cpu())
-        self.val_ss_preds.append(ss_pred.detach().cpu())
-        self.val_ss_trues.append(ss_true.detach().cpu())
-
-        return {}
-
 
     def __init__(self, fold=0):
         super().__init__()
-        
-        # ========== ADD THESE ==========
-        # buffers for collecting predictions
-        self.val_nfn_preds = []
-        self.val_nfn_trues = []
-        self.val_ss_preds  = []
-        self.val_ss_trues  = []
-
-        # confusion matrices (per-task)
-        # self.cm_nfn = ConfusionMatrix(num_classes=3)
-        # self.cm_ss  = ConfusionMatrix(num_classes=3)
-        self.cm_nfn = MulticlassConfusionMatrix(num_classes=3)
-        self.cm_ss  = MulticlassConfusionMatrix(num_classes=3)
-        # =================================
-
-
         cols = []
         label_features = [
             'neural_foraminal_narrowing',
@@ -986,8 +894,6 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         self.label_features = cols
         self.num_classes = len(self.label_features)
         self.task = "multiclass"
-
-        self.model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
         
         self.image_size = 224
         self.batch_size = 8
@@ -1002,6 +908,16 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         # ====== Two Loss Functions ======
         self.criterion_nfn = MultiClassFocalLoss(gamma=2.0, alpha=self.alpha_nfn)
         self.criterion_ss  = MultiClassFocalLoss(gamma=2.0, alpha=self.alpha_ss)
+
+        # self.model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
+        base = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
+
+        self.model = AxialSSNFNWrapper(
+            base_model=base,
+            lr=self.lr,
+            criterion_nfn=self.criterion_nfn,
+            criterion_ss=self.criterion_ss,
+        )
 
         self.box_crop = True
         self.box_crop_x_ratio = 1
