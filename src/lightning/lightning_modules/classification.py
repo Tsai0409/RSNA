@@ -536,29 +536,19 @@ class MyLightningModule(pl.LightningModule):
         images, targets = batch
         logits = self.forward(images)
 
-        # ====================================================
-        # Multi-task NFN + SS loss (ONLY for axial_ss_nfn)
-        # ====================================================
-        if hasattr(self.cfg, "is_axial_ss_nfn") and self.cfg.is_axial_ss_nfn:
-            nfn_logits, ss_logits = logits     # ← ★ tuple 拆開
-            nfn_targets = targets[:, 0].long()
-            ss_targets  = targets[:, 1].long()
-
-            loss_nfn = F.cross_entropy(nfn_logits, nfn_targets)
-            loss_ss  = F.cross_entropy(ss_logits, ss_targets)
-            loss = loss_nfn + loss_ss
-
-            self.log("train_loss", loss, on_step=False, on_epoch=True)
-            self.log("train_loss_nfn", loss_nfn, on_epoch=True)
-            self.log("train_loss_ss",  loss_ss,  on_epoch=True)
-
-            return loss
-
-        # ====================================================
-        # Normal single-head behavior for ALL OTHER MODELS
-        # ====================================================
         loss = self.criterion(logits, targets)
 
+        # -------------------------------
+        #  special case: axial_ss_nfn
+        #  -> 只管 loss，不要用原本 6-class metrics
+        # -------------------------------
+        if getattr(self.cfg, "is_axial_ss_nfn", False):
+            self.log("train_loss", loss, on_step=False, on_epoch=True)
+            return loss
+
+        # -------------------------------
+        #  原本的單頭 6-class 行為
+        # -------------------------------
         preds, y_true = self._get_preds_targets(logits, targets)
 
         self.train_acc.update(preds, y_true)
@@ -569,7 +559,13 @@ class MyLightningModule(pl.LightningModule):
             self.train_confmat.update(preds, y_true)
 
         self.log("train_loss", loss, on_step=False, on_epoch=True)
+        self.log("train_acc", self.train_acc, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("train_precision", self.train_precision, on_step=False, on_epoch=True)
+        self.log("train_recall", self.train_recall, on_step=False, on_epoch=True)
+        self.log("train_f1", self.train_f1, on_step=False, on_epoch=True)
+
         return loss
+
 
     # =============================
     # Validation step
@@ -578,38 +574,28 @@ class MyLightningModule(pl.LightningModule):
         images, targets = batch
         logits = self.forward(images)
 
-        # ====================================================
-        # Multi-task NFN + SS loss (ONLY for axial_ss_nfn)
-        # ====================================================
-        if hasattr(self.cfg, "is_axial_ss_nfn") and self.cfg.is_axial_ss_nfn:
-            nfn_logits, ss_logits = logits
-            nfn_targets = targets[:, 0].long()
-            ss_targets  = targets[:, 1].long()
+        loss = self.criterion(logits, targets)
 
-            loss_nfn = F.cross_entropy(nfn_logits, nfn_targets)
-            loss_ss  = F.cross_entropy(ss_logits, ss_targets)
-            loss = loss_nfn + loss_ss
+        # -------------------------------
+        #  special case: axial_ss_nfn
+        #  -> 不用原本 6-class metrics，只存 logits / targets 給 epoch_end 用
+        # -------------------------------
+        if getattr(self.cfg, "is_axial_ss_nfn", False):
 
-            # ------------ store each head separately -----------
-            if not hasattr(self, "val_nfn_logits"):
-                self.val_nfn_logits = []
-                self.val_ss_logits = []
-                self.val_nfn_trues = []
-                self.val_ss_trues = []
+            if not hasattr(self, "val_logits"):
+                self.val_logits = []
+                self.val_targets = []
 
-            self.val_nfn_logits.append(nfn_logits.detach().cpu())
-            self.val_ss_logits.append(ss_logits.detach().cpu())
-            self.val_nfn_trues.append(nfn_targets.cpu())
-            self.val_ss_trues.append(ss_targets.cpu())
+            # logits 是 Tensor (B, 6)，targets 是 (B, 2)
+            self.val_logits.append(logits.detach().cpu())
+            self.val_targets.append(targets.detach().cpu())
 
             self.log("val_loss", loss, on_epoch=True, prog_bar=True)
             return {"loss": loss.detach()}
 
-        # ====================================================
-        # Normal single-head behavior
-        # ====================================================
-        loss = self.criterion(logits, targets)
-
+        # -------------------------------
+        #  原本的單頭 6-class 行為
+        # -------------------------------
         preds, y_true = self._get_preds_targets(logits, targets)
 
         self.val_acc.update(preds, y_true)
@@ -621,6 +607,7 @@ class MyLightningModule(pl.LightningModule):
 
         self.log("val_loss", loss, on_epoch=True, prog_bar=True)
         return {"loss": loss.detach()}
+
 
     # =============================
     # End of epoch
@@ -647,26 +634,70 @@ class MyLightningModule(pl.LightningModule):
         self.train_f1.reset()
 
     def validation_epoch_end(self, outputs):
-        # Normal metric logging
-        acc = self.val_acc.compute()
-        prec = self.val_precision.compute()
-        rec = self.val_recall.compute()
-        f1 = self.val_f1.compute()
 
-        self.log("val_acc", acc, prog_bar=True)
-        self.log("val_precision", prec, prog_bar=True)
-        self.log("val_recall", rec, prog_bar=True)
-        self.log("val_f1", f1, prog_bar=True)
+        # ------------------------------------------------
+        # 非 axial_ss_nfn：走原本 6-class metrics 邏輯
+        # ------------------------------------------------
+        if not getattr(self.cfg, "is_axial_ss_nfn", False):
 
-        if self.val_confmat:
-            confmat = self.val_confmat.compute()
-            print(f"\n[Valid] Confusion Matrix:\n{confmat.cpu().numpy()}")
-            self.val_confmat.reset()
+            acc = self.val_acc.compute()
+            prec = self.val_precision.compute()
+            rec = self.val_recall.compute()
+            f1 = self.val_f1.compute()
 
-        self.val_acc.reset()
-        self.val_precision.reset()
-        self.val_recall.reset()
-        self.val_f1.reset()
+            self.log("val_acc", acc, prog_bar=True)
+            self.log("val_precision", prec, prog_bar=True)
+            self.log("val_recall", rec, prog_bar=True)
+            self.log("val_f1", f1, prog_bar=True)
+
+            if self.val_confmat:
+                confmat = self.val_confmat.compute()
+                print(f"\n[Valid] Confusion Matrix:\n{confmat.cpu().numpy()}")
+                self.val_confmat.reset()
+
+            self.val_acc.reset()
+            self.val_precision.reset()
+            self.val_recall.reset()
+            self.val_f1.reset()
+
+        # ------------------------------------------------
+        # axial_ss_nfn：只算 / 印 multi-task 的 NFN / SS 混淆矩陣
+        # ------------------------------------------------
+        if getattr(self.cfg, "is_axial_ss_nfn", False):
+            print("\n========== Multi-task Confusion Matrices ==========\n")
+
+            logits = torch.cat(self.val_logits, dim=0)
+            targets = torch.cat(self.val_targets, dim=0)
+
+            # 拆成 multi-task
+            nfn_logits = logits[:, :3]
+            ss_logits  = logits[:, 3:]
+
+            nfn_true = targets[:, 0].long()
+            ss_true  = targets[:, 1].long()
+
+            nfn_pred = nfn_logits.argmax(dim=1)
+            ss_pred  = ss_logits.argmax(dim=1)
+
+            # NFN ConfMat
+            cm_nfn = torch.zeros(3, 3, dtype=torch.int64)
+            for t, p in zip(nfn_true, nfn_pred):
+                cm_nfn[t, p] += 1
+
+            # SS ConfMat
+            cm_ss = torch.zeros(3, 3, dtype=torch.int64)
+            for t, p in zip(ss_true, ss_pred):
+                cm_ss[t, p] += 1
+
+            print("[NFN Confusion Matrix 3x3]")
+            print(cm_nfn.numpy())
+
+            print("\n[SS Confusion Matrix 3x3]")
+            print(cm_ss.numpy())
+
+            self.val_logits.clear()
+            self.val_targets.clear()
+
 
         # ====================================================
         # Multi-task confusion matrix output
