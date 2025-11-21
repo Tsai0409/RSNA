@@ -529,26 +529,33 @@ class MyLightningModule(pl.LightningModule):
     def forward(self, x):
         return self.model(x)
 
+
     # =============================
     # Training step
     # =============================
     def training_step(self, batch, batch_idx):
         images, targets = batch
-        logits = self.forward(images)
-
-        loss = self.criterion(logits, targets)
+        logits = self.model(images)   # << 永遠回 Tensor
 
         # -------------------------------
-        #  special case: axial_ss_nfn
-        #  -> 只管 loss，不要用原本 6-class metrics
+        # special case: axial_ss_nfn
+        # -> 使用 wrapper 自己的 loss，不跑 6-class metrics
         # -------------------------------
         if getattr(self.cfg, "is_axial_ss_nfn", False):
+
+            # logits: (B, 6)
+            loss_nfn = self.cfg.criterion_nfn(logits[:, :3], targets[:, 0])
+            loss_ss  = self.cfg.criterion_ss(logits[:, 3:], targets[:, 1])
+            loss = loss_nfn + loss_ss
+
             self.log("train_loss", loss, on_step=False, on_epoch=True)
             return loss
 
         # -------------------------------
-        #  原本的單頭 6-class 行為
+        # 原本的單頭 6-class 行為
         # -------------------------------
+        loss = self.criterion(logits, targets)
+
         preds, y_true = self._get_preds_targets(logits, targets)
 
         self.train_acc.update(preds, y_true)
@@ -572,30 +579,32 @@ class MyLightningModule(pl.LightningModule):
     # =============================
     def validation_step(self, batch, batch_idx):
         images, targets = batch
-        logits = self.forward(images)
-
-        loss = self.criterion(logits, targets)
+        logits = self.model(images)
 
         # -------------------------------
-        #  special case: axial_ss_nfn
-        #  -> 不用原本 6-class metrics，只存 logits / targets 給 epoch_end 用
+        # axial_ss_nfn：不要跑 6-class metrics
         # -------------------------------
         if getattr(self.cfg, "is_axial_ss_nfn", False):
+
+            loss_nfn = self.cfg.criterion_nfn(logits[:, :3], targets[:, 0])
+            loss_ss  = self.cfg.criterion_ss(logits[:, 3:], targets[:, 1])
+            loss = loss_nfn + loss_ss
 
             if not hasattr(self, "val_logits"):
                 self.val_logits = []
                 self.val_targets = []
 
-            # logits 是 Tensor (B, 6)，targets 是 (B, 2)
-            self.val_logits.append(logits.detach().cpu())
-            self.val_targets.append(targets.detach().cpu())
+            self.val_logits.append(logits.detach().cpu())     # (B, 6)
+            self.val_targets.append(targets.detach().cpu())   # (B, 2)
 
             self.log("val_loss", loss, on_epoch=True, prog_bar=True)
             return {"loss": loss.detach()}
 
         # -------------------------------
-        #  原本的單頭 6-class 行為
+        # 原本 6-class 行為
         # -------------------------------
+        loss = self.criterion(logits, targets)
+
         preds, y_true = self._get_preds_targets(logits, targets)
 
         self.val_acc.update(preds, y_true)
@@ -610,9 +619,15 @@ class MyLightningModule(pl.LightningModule):
 
 
     # =============================
-    # End of epoch
+    # End of training epoch
     # =============================
     def training_epoch_end(self, outputs):
+
+        # axial_ss_nfn：不需要 6-class metrics
+        if getattr(self.cfg, "is_axial_ss_nfn", False):
+            return
+
+        # 6-class 原本行為
         acc = self.train_acc.compute()
         prec = self.train_precision.compute()
         rec = self.train_recall.compute()
@@ -633,10 +648,14 @@ class MyLightningModule(pl.LightningModule):
         self.train_recall.reset()
         self.train_f1.reset()
 
+
+    # =============================
+    # End of validation epoch
+    # =============================
     def validation_epoch_end(self, outputs):
 
         # ------------------------------------------------
-        # 非 axial_ss_nfn：走原本 6-class metrics 邏輯
+        # 非 axial_ss_nfn → 走 6-class 原本流程
         # ------------------------------------------------
         if not getattr(self.cfg, "is_axial_ss_nfn", False):
 
@@ -660,43 +679,43 @@ class MyLightningModule(pl.LightningModule):
             self.val_recall.reset()
             self.val_f1.reset()
 
+            return
+
         # ------------------------------------------------
-        # axial_ss_nfn：只算 / 印 multi-task 的 NFN / SS 混淆矩陣
+        # axial_ss_nfn → multi-task 3x3 + 3x3 混淆矩陣
         # ------------------------------------------------
-        if getattr(self.cfg, "is_axial_ss_nfn", False):
-            print("\n========== Multi-task Confusion Matrices ==========\n")
+        print("\n========== Multi-task Confusion Matrices ==========\n")
 
-            logits = torch.cat(self.val_logits, dim=0)
-            targets = torch.cat(self.val_targets, dim=0)
+        logits = torch.cat(self.val_logits, dim=0)
+        targets = torch.cat(self.val_targets, dim=0)
 
-            # 拆成 multi-task
-            nfn_logits = logits[:, :3]
-            ss_logits  = logits[:, 3:]
+        nfn_logits = logits[:, :3]
+        ss_logits  = logits[:, 3:]
 
-            nfn_true = targets[:, 0].long()
-            ss_true  = targets[:, 1].long()
+        nfn_true = targets[:, 0].long()
+        ss_true  = targets[:, 1].long()
 
-            nfn_pred = nfn_logits.argmax(dim=1)
-            ss_pred  = ss_logits.argmax(dim=1)
+        nfn_pred = nfn_logits.argmax(dim=1)
+        ss_pred  = ss_logits.argmax(dim=1)
 
-            # NFN ConfMat
-            cm_nfn = torch.zeros(3, 3, dtype=torch.int64)
-            for t, p in zip(nfn_true, nfn_pred):
-                cm_nfn[t, p] += 1
+        cm_nfn = torch.zeros(3, 3, dtype=torch.int64)
+        cm_ss  = torch.zeros(3, 3, dtype=torch.int64)
 
-            # SS ConfMat
-            cm_ss = torch.zeros(3, 3, dtype=torch.int64)
-            for t, p in zip(ss_true, ss_pred):
-                cm_ss[t, p] += 1
+        for t, p in zip(nfn_true, nfn_pred):
+            cm_nfn[t, p] += 1
 
-            print("[NFN Confusion Matrix 3x3]")
-            print(cm_nfn.numpy())
+        for t, p in zip(ss_true, ss_pred):
+            cm_ss[t, p] += 1
 
-            print("\n[SS Confusion Matrix 3x3]")
-            print(cm_ss.numpy())
+        print("[NFN Confusion Matrix 3x3]")
+        print(cm_nfn.numpy())
 
-            self.val_logits.clear()
-            self.val_targets.clear()
+        print("\n[SS Confusion Matrix 3x3]")
+        print(cm_ss.numpy())
+
+        self.val_logits.clear()
+        self.val_targets.clear()
+
 
 
         # ====================================================
