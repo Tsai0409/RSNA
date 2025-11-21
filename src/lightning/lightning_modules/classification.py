@@ -624,49 +624,48 @@ class MyLightningModule(pl.LightningModule):
         self.val_recall.reset()
         self.val_f1.reset()
 
+        # ============================================================
+        #  Extra evaluation for axial_ss_nfn multi-task model
+        # ============================================================
 
-    # ============================================================
-    #  Extra evaluation for axial_ss_nfn multi-task model
-    # ============================================================
+        if hasattr(self.cfg, "is_axial_ss_nfn") and self.cfg.is_axial_ss_nfn:
 
-    if hasattr(self.cfg, "is_axial_ss_nfn") and self.cfg.is_axial_ss_nfn:
+            print("\n[AXIAL SS / NFN] Multi-task evaluation activated")
 
-        print("\n[AXIAL SS / NFN] Multi-task evaluation activated")
+            # logits collected during validation
+            all_logits = torch.cat(self.validation_step_outputs["logits"], dim=0)
+            all_targets = torch.cat(self.validation_step_outputs["targets"], dim=0)
 
-        # logits collected during validation
-        all_logits = torch.cat(self.validation_step_outputs["logits"], dim=0)
-        all_targets = torch.cat(self.validation_step_outputs["targets"], dim=0)
+            # split logits:
+            nfn_logits = all_logits[:, :3]
+            ss_logits = all_logits[:, 3:]
 
-        # split logits:
-        nfn_logits = all_logits[:, :3]
-        ss_logits = all_logits[:, 3:]
+            nfn_pred = torch.argmax(nfn_logits, dim=1)
+            ss_pred = torch.argmax(ss_logits, dim=1)
 
-        nfn_pred = torch.argmax(nfn_logits, dim=1)
-        ss_pred = torch.argmax(ss_logits, dim=1)
+            # targets: shape (B, 2)
+            nfn_true = all_targets[:, 0]
+            ss_true  = all_targets[:, 1]
 
-        # targets: shape (B, 2)
-        nfn_true = all_targets[:, 0]
-        ss_true  = all_targets[:, 1]
+            from sklearn.metrics import confusion_matrix
 
-        from sklearn.metrics import confusion_matrix
+            cm_nfn = confusion_matrix(nfn_true.cpu().numpy(),
+                                    nfn_pred.cpu().numpy(),
+                                    labels=[0,1,2])
 
-        cm_nfn = confusion_matrix(nfn_true.cpu().numpy(),
-                                nfn_pred.cpu().numpy(),
-                                labels=[0,1,2])
+            cm_ss = confusion_matrix(ss_true.cpu().numpy(),
+                                    ss_pred.cpu().numpy(),
+                                    labels=[0,1,2])
 
-        cm_ss = confusion_matrix(ss_true.cpu().numpy(),
-                                ss_pred.cpu().numpy(),
-                                labels=[0,1,2])
+            print("\n========== Multi-task Confusion Matrices ==========\n")
 
-        print("\n========== Multi-task Confusion Matrices ==========\n")
+            print("[NFN Confusion Matrix 3x3]")
+            print(cm_nfn)
 
-        print("[NFN Confusion Matrix 3x3]")
-        print(cm_nfn)
+            print("\n[SS Confusion Matrix 3x3]")
+            print(cm_ss)
 
-        print("\n[SS Confusion Matrix 3x3]")
-        print(cm_ss)
-
-        print("\n=========================================\n")
+            print("\n=========================================\n")
 
 
 
