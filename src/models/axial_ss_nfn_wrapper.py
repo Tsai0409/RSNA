@@ -1,3 +1,10 @@
+# axial_ss_nfn_wrapper.py
+import pytorch_lightning as pl
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torchmetrics.classification import MulticlassConfusionMatrix
+
 class AxialSSNFNWrapper(pl.LightningModule):
     def __init__(self, base_model, lr, criterion_nfn, criterion_ss):
         super().__init__()
@@ -5,8 +12,7 @@ class AxialSSNFNWrapper(pl.LightningModule):
         self.lr = lr
         self.criterion_nfn = criterion_nfn
         self.criterion_ss = criterion_ss
-
-        from torchmetrics.classification import MulticlassConfusionMatrix
+        
         self.cm_nfn = MulticlassConfusionMatrix(num_classes=3)
         self.cm_ss  = MulticlassConfusionMatrix(num_classes=3)
 
