@@ -1,4 +1,3 @@
-# axial_ss_nfn_wrapper.py
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -8,7 +7,7 @@ from torchmetrics.classification import MulticlassConfusionMatrix
 
 class AxialSSNFNWrapper(pl.LightningModule):
     """
-    Multi-task LightningModule wrapper for:
+    Multi-task wrapper for:
       - Neural Foraminal Narrowing (3-class)
       - Subarticular Stenosis    (3-class)
     """
@@ -16,68 +15,68 @@ class AxialSSNFNWrapper(pl.LightningModule):
     def __init__(self, base_model, lr, criterion_nfn, criterion_ss):
         super().__init__()
 
+        self.save_hyperparameters(ignore=["base_model"])
+
         self.base_model = base_model
         self.lr = lr
         self.criterion_nfn = criterion_nfn
-        self.criterion_ss  = criterion_ss
+        self.criterion_ss = criterion_ss
 
-        # ----------------------------------------
-        # 🔥 Add two new heads
-        # ----------------------------------------
-        # base_model.num_features = feature dim
-        feat_dim = getattr(base_model, "num_features", 2048)
-        self.nfn_head = nn.Linear(feat_dim, 3)
-        self.ss_head  = nn.Linear(feat_dim, 3)
+        # number of features after FPN pooling concat
+        # base_model.classifier = nn.Linear(feature_size*5, num_classes)
+        # → 所以 in_features = base_model.classifier.in_features
+        in_features = base_model.classifier.in_features
 
-        # metrics
+        # remove original classifier
+        self.base_model.classifier = nn.Identity()
+
+        # create multi-task heads
+        self.head_nfn = nn.Linear(in_features, 3)
+        self.head_ss  = nn.Linear(in_features, 3)
+
+        # confusion matrix
         self.cm_nfn = MulticlassConfusionMatrix(num_classes=3)
-        self.cm_ss  = MulticlassConfusionMatrix(num_classes=3)
+        self.cm_ss = MulticlassConfusionMatrix(num_classes=3)
 
-        self.val_nfn_preds = []
-        self.val_nfn_trues = []
-        self.val_ss_preds = []
-        self.val_ss_trues = []
+        self.val_nfn_preds, self.val_nfn_trues = [], []
+        self.val_ss_preds, self.val_ss_trues = [], []
 
         print(">>> AxialSSNFNWrapper initialized (multi-task)")
 
-    # -------------------------------------------------
+
+    # ----------------------------------------
     def forward(self, x):
-        # ----------------------------------------
-        # ❗ We DON'T use base_model(x)
-        # Instead we extract features only
-        # ----------------------------------------
-        if hasattr(self.base_model, "forward_features"):
-            feat = self.base_model.forward_features(x)
-        else:
-            feat = self.base_model.extract_features(x)
+        """
+        Run backbone + FPN + pooling → feature vec.
+        Then apply 2 heads.
+        """
+        feat = self.base_model(x)  # this returns feature_vec because classifier=Identity()
+        nfn_logits = self.head_nfn(feat)
+        ss_logits  = self.head_ss(feat)
+        return nfn_logits, ss_logits
 
-        feat = torch.flatten(feat, 1)
 
-        nfn = self.nfn_head(feat)
-        ss  = self.ss_head(feat)
-
-        return torch.cat([nfn, ss], dim=1)
-
-    # -------------------------------------------------
+    # ----------------------------------------
     def training_step(self, batch, batch_idx):
         images, targets = batch
-        logits = self(images)
+        nfn_logits, ss_logits = self(images)
 
         loss = (
-            self.criterion_nfn(logits[:, :3], targets[:, 0]) +
-            self.criterion_ss (logits[:, 3:], targets[:, 1])
+            self.criterion_nfn(nfn_logits, targets[:, 0]) +
+            self.criterion_ss(ss_logits, targets[:, 1])
         )
 
-        self.log("train_loss", loss, prog_bar=True)
+        self.log("train_loss", loss, prog_bar=True, on_step=True, on_epoch=True)
         return loss
 
-    # -------------------------------------------------
+
+    # ----------------------------------------
     def validation_step(self, batch, batch_idx):
         images, targets = batch
-        logits = self(images)
+        nfn_logits, ss_logits = self(images)
 
-        nfn_pred = torch.argmax(logits[:, :3], dim=1)
-        ss_pred  = torch.argmax(logits[:, 3:], dim=1)
+        nfn_pred = nfn_logits.argmax(dim=1)
+        ss_pred  = ss_logits.argmax(dim=1)
 
         self.val_nfn_preds.append(nfn_pred.cpu())
         self.val_nfn_trues.append(targets[:, 0].cpu())
@@ -86,26 +85,27 @@ class AxialSSNFNWrapper(pl.LightningModule):
 
         return {}
 
-    # -------------------------------------------------
+
+    # ----------------------------------------
     def validation_epoch_end(self, outputs):
         nfn_preds = torch.cat(self.val_nfn_preds)
         nfn_trues = torch.cat(self.val_nfn_trues)
-        ss_preds  = torch.cat(self.val_ss_preds)
-        ss_trues  = torch.cat(self.val_ss_trues)
+        ss_preds = torch.cat(self.val_ss_preds)
+        ss_trues = torch.cat(self.val_ss_trues)
 
-        print("\n========== VALIDATION RESULTS ==========")
+        print("\n========== Multi-task Confusion Matrices ==========\n")
 
-        print("\nNFN Confusion Matrix (3x3):")
-        print(self.cm_nfn(nfn_preds, nfn_trues).cpu().numpy())
+        print("[NFN Confusion Matrix]")
+        print(self.cm_nfn(nfn_preds, nfn_trues).numpy())
 
-        print("\nSS Confusion Matrix (3x3):")
-        print(self.cm_ss(ss_preds, ss_trues).cpu().numpy())
+        print("\n[SS Confusion Matrix]")
+        print(self.cm_ss(ss_preds, ss_trues).numpy())
 
         self.val_nfn_preds.clear()
         self.val_nfn_trues.clear()
         self.val_ss_preds.clear()
         self.val_ss_trues.clear()
 
-    # -------------------------------------------------
+    # ----------------------------------------
     def configure_optimizers(self):
         return torch.optim.AdamW(self.parameters(), lr=self.lr)
