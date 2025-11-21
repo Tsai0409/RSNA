@@ -10,6 +10,7 @@ import numpy as np
 import random
 from scipy.special import softmax
 from sklearn.metrics import roc_auc_score
+from sklearn.metrics import confusion_matrix
 from pdb import set_trace as st
 from .scheduler_optimizer import get_optimizer, get_scheduler
 
@@ -459,6 +460,9 @@ from torchmetrics import Accuracy, Precision, Recall, F1Score, ConfusionMatrix
 class MyLightningModule(pl.LightningModule):
     def __init__(self, cfg):
         super().__init__()
+        self.val_logits = []
+        self.val_targets = []
+
         self.model = cfg.model
         self.criterion = cfg.criterion
 
@@ -561,9 +565,7 @@ class MyLightningModule(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         images, targets = batch
         logits = self.forward(images)
-        # loss = self.cfg.criterion(logits, targets)
         loss = self.criterion(logits, targets)
-
 
         preds, y_true = self._get_preds_targets(logits, targets)
 
@@ -575,9 +577,19 @@ class MyLightningModule(pl.LightningModule):
         if self.val_confmat:
             self.val_confmat.update(preds, y_true)
 
+        # -----------------------------------------
+        # Extra collection for axial_ss_nfn multi-task model
+        # -----------------------------------------
+        if hasattr(self.cfg, "is_axial_ss_nfn") and self.cfg.is_axial_ss_nfn:
+            if not hasattr(self, "val_logits"):
+                self.val_logits = []
+                self.val_targets = []
+            self.val_logits.append(logits.detach().cpu())
+            self.val_targets.append(targets.detach().cpu())
 
         self.log("val_loss", loss, on_epoch=True, prog_bar=True)
         return {"loss": loss.detach()}
+
 
     # =============================
     # End of epoch
@@ -627,45 +639,39 @@ class MyLightningModule(pl.LightningModule):
         # ============================================================
         #  Extra evaluation for axial_ss_nfn multi-task model
         # ============================================================
-
         if hasattr(self.cfg, "is_axial_ss_nfn") and self.cfg.is_axial_ss_nfn:
 
-            print("\n[AXIAL SS / NFN] Multi-task evaluation activated")
+            if len(self.val_logits) == 0:
+                print("[AXIAL SS / NFN] No validation logits collected.")
+                return
 
-            # logits collected during validation
-            all_logits = torch.cat(self.validation_step_outputs["logits"], dim=0)
-            all_targets = torch.cat(self.validation_step_outputs["targets"], dim=0)
+            logits_all = torch.cat(self.val_logits, dim=0)
+            targets_all = torch.cat(self.val_targets, dim=0)
 
-            # split logits:
-            nfn_logits = all_logits[:, :3]
-            ss_logits = all_logits[:, 3:]
+            # split into two heads
+            nfn_logits = logits_all[:, :3]
+            ss_logits  = logits_all[:, 3:]
 
             nfn_pred = torch.argmax(nfn_logits, dim=1)
-            ss_pred = torch.argmax(ss_logits, dim=1)
+            ss_pred  = torch.argmax(ss_logits, dim=1)
 
-            # targets: shape (B, 2)
-            nfn_true = all_targets[:, 0]
-            ss_true  = all_targets[:, 1]
+            nfn_true = targets_all[:, 0]
+            ss_true  = targets_all[:, 1]
 
-            from sklearn.metrics import confusion_matrix
-
-            cm_nfn = confusion_matrix(nfn_true.cpu().numpy(),
-                                    nfn_pred.cpu().numpy(),
-                                    labels=[0,1,2])
-
-            cm_ss = confusion_matrix(ss_true.cpu().numpy(),
-                                    ss_pred.cpu().numpy(),
-                                    labels=[0,1,2])
+            cm_nfn = confusion_matrix(nfn_true.numpy(), nfn_pred.numpy(), labels=[0,1,2])
+            cm_ss  = confusion_matrix(ss_true.numpy(), ss_pred.numpy(), labels=[0,1,2])
 
             print("\n========== Multi-task Confusion Matrices ==========\n")
-
             print("[NFN Confusion Matrix 3x3]")
             print(cm_nfn)
 
             print("\n[SS Confusion Matrix 3x3]")
             print(cm_ss)
 
-            print("\n=========================================\n")
+            # clear buffer
+            self.val_logits.clear()
+            self.val_targets.clear()
+
 
 
 
