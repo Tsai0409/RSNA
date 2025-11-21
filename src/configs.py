@@ -886,8 +886,8 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         
         self.image_size = 224
         self.batch_size = 8
-        self.lr = 1e-4
-        self.epochs = 20
+        self.lr = 1e-4  # 5.5e-5
+        self.epochs = 20  # 10
         self.transform = medical_v4
 
         # -----------------------------
