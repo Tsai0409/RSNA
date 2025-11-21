@@ -914,6 +914,32 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         loss_ss  = self.criterion_ss(ss_logits, ss_target)
 
         return loss_nfn + loss_ss
+    
+    def validation_step(self, batch, batch_idx):
+        images, targets = batch
+
+        logits = self(images)
+
+        # 分頭 logits
+        nfn_logits = logits[:, :3]
+        ss_logits  = logits[:, 3:]
+
+        # 預測
+        nfn_pred = torch.argmax(nfn_logits, dim=1)
+        ss_pred  = torch.argmax(ss_logits,  dim=1)
+
+        # Ground truth
+        nfn_true = targets[:, 0]
+        ss_true  = targets[:, 1]
+
+        # 收集（放 CPU，避免 GPU 累積記憶體爆炸）
+        self.val_nfn_preds.append(nfn_pred.detach().cpu())
+        self.val_nfn_trues.append(nfn_true.detach().cpu())
+        self.val_ss_preds.append(ss_pred.detach().cpu())
+        self.val_ss_trues.append(ss_true.detach().cpu())
+
+        return {}
+
 
     def __init__(self, fold=0):
         super().__init__()
