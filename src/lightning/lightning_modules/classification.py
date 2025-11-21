@@ -655,37 +655,41 @@ class MyLightningModule(pl.LightningModule):
         #  Extra evaluation for axial_ss_nfn multi-task model
         # ============================================================
         if hasattr(self.cfg, "is_axial_ss_nfn") and self.cfg.is_axial_ss_nfn:
-
-            if len(self.val_logits) == 0:
-                print("[AXIAL SS / NFN] No validation logits collected.")
-                return
-
-            logits_all = torch.cat(self.val_logits, dim=0)
-            targets_all = torch.cat(self.val_targets, dim=0)
-
-            # split into two heads
-            nfn_logits = logits_all[:, :3]
-            ss_logits  = logits_all[:, 3:]
-
-            nfn_pred = torch.argmax(nfn_logits, dim=1)
-            ss_pred  = torch.argmax(ss_logits, dim=1)
-
-            nfn_true = targets_all[:, 0]
-            ss_true  = targets_all[:, 1]
-
-            cm_nfn = confusion_matrix(nfn_true.numpy(), nfn_pred.numpy(), labels=[0,1,2])
-            cm_ss  = confusion_matrix(ss_true.numpy(), ss_pred.numpy(), labels=[0,1,2])
-
             print("\n========== Multi-task Confusion Matrices ==========\n")
+
+            logits = torch.cat(self.val_logits, dim=0)
+            targets = torch.cat(self.val_targets, dim=0)
+
+            # 拆成 multi-task
+            nfn_logits = logits[:, :3]
+            ss_logits  = logits[:, 3:]
+
+            nfn_true = targets[:, 0]
+            ss_true  = targets[:, 1]
+
+            nfn_pred = nfn_logits.argmax(dim=1)
+            ss_pred  = ss_logits.argmax(dim=1)
+
+            # NFN ConfMat
+            cm_nfn = torch.zeros(3, 3, dtype=torch.int64)
+            for t, p in zip(nfn_true, nfn_pred):
+                cm_nfn[t, p] += 1
+
+            # SS ConfMat
+            cm_ss = torch.zeros(3, 3, dtype=torch.int64)
+            for t, p in zip(ss_true, ss_pred):
+                cm_ss[t, p] += 1
+
             print("[NFN Confusion Matrix 3x3]")
-            print(cm_nfn)
+            print(cm_nfn.numpy())
 
             print("\n[SS Confusion Matrix 3x3]")
-            print(cm_ss)
+            print(cm_ss.numpy())
 
-            # clear buffer
             self.val_logits.clear()
             self.val_targets.clear()
+
+            return
 
 
 
