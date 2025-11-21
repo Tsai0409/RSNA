@@ -866,47 +866,58 @@ class rsna_v1_ResNet50V2(Baseline_ResNet50V2):
         self.p_rand_order_v1 = 0
 
 class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
+    """
+    Multi-task version of axial spinal model:
+      - Neural Foraminal Narrowing
+      - Subarticular Stenosis
+    Each: Normal, Moderate, Severe → 3 classes
+    Total outputs: 6 logits
+    """
+
     def __init__(self, fold=0):
         super().__init__()
-        
-        cols = []
-        label_features = [
-            'neural_foraminal_narrowing',
-            'subarticular_stenosis',
-        ]
-        for col in label_features:
-            cols.append(f'{col}_normal')
-            cols.append(f'{col}_moderate')
-            cols.append(f'{col}_severe')
 
+        # --------------------------
+        # Dataset label config
+        # --------------------------
         self.fold = fold
-        self.label_features = cols
-        self.num_classes = len(self.label_features)
+        self.label_features = [
+            'neural_foraminal_narrowing_normal',
+            'neural_foraminal_narrowing_moderate',
+            'neural_foraminal_narrowing_severe',
+            'subarticular_stenosis_normal',
+            'subarticular_stenosis_moderate',
+            'subarticular_stenosis_severe',
+        ]
+        self.num_classes = 6
         self.task = "multiclass"
-        
-        self.image_size = 224
+
+        # --------------------------
+        # Hyperparameters
+        # --------------------------
+        self.lr = 1e-4
         self.batch_size = 8
-        self.lr = 1e-4  # 5.5e-5
-        self.epochs = 20  # 10
+        self.image_size = 224
+        self.epochs = 20
         self.transform = medical_v4
 
-        # -----------------------------
-        # FIRST define the two loss functions
-        # -----------------------------
+        # --------------------------
+        # Multi-task loss
+        # --------------------------
         self.alpha_nfn = torch.tensor([0.04, 0.33, 0.63]).float()
-        self.alpha_ss  = torch.tensor([0.05, 0.30, 0.65]).float()
+        self.alpha_ss = torch.tensor([0.05, 0.30, 0.65]).float()
 
         self.criterion_nfn = MultiClassFocalLoss(gamma=2.0, alpha=self.alpha_nfn)
-        self.criterion_ss  = MultiClassFocalLoss(gamma=2.0, alpha=self.alpha_ss)
+        self.criterion_ss = MultiClassFocalLoss(gamma=2.0, alpha=self.alpha_ss)
 
-        # -----------------------------
-        # NEXT define backbone
-        # -----------------------------
+        # --------------------------
+        # Backbone Model
+        # --------------------------
         base = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
 
-        # -----------------------------
-        # LAST: construct wrapper (now lr & loss already exist)
-        # -----------------------------
+        # --------------------------
+        # Wrap backbone into multi-task LightningModule
+        # --------------------------
         self.model = AxialSSNFNWrapper(
             base_model=base,
             lr=self.lr,
@@ -914,27 +925,29 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
             criterion_ss=self.criterion_ss,
         )
 
-        # the rest configs
+        # --------------------------
+        # Other configs
+        # --------------------------
         self.box_crop = True
         self.box_crop_x_ratio = 1
         self.box_crop_y_ratio = 2
         self.center_pad_ratio = 0
         self.image_width_ratio = 1
 
-        self.drop_rate = 0.0
-        self.drop_path_rate = 0.0
-        self.metric = None
-        self.memo = ''
-        
         self.grad_accumulations = 2
-        self.crop_by_xy = False
-        self.rsna_2024_multi_image = False
-        self.rsna_random_sample = False
-        self.rsna_2024_agg_val = False
-        
+        self.memo = ""
+        self.metric = None
+
+        # --------------------------
+        # Build dataframe
+        # --------------------------
         self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_holdout_7/axial_classification_holdout.csv'
         self._build_dataframes()
 
+    # ------------------------------------------------------
+    # REMOVE calculate_loss: wrapper handles training loss.
+    # If present, it may override wrapper logic accidentally.
+    # ------------------------------------------------------
 
     def _build_dataframes(self):
         # ----- 共用欄位處理 -----
