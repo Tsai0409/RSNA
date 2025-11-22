@@ -19,47 +19,37 @@ class AxialSSNFNWrapper(MyLightningModule):
         self.criterion_nfn = criterion_nfn
         self.criterion_ss = criterion_ss
 
-        # 這個 flag 你在 rsna_axial_ss_nfn_ResNet50V2 有設 is_axial_ss_nfn = True
-        # base 的 classification.py 很可能用這個判斷 multi-task 分支
         self.is_axial_ss_nfn = True
 
         self.save_hyperparameters(ignore=["base_model", "criterion_nfn", "criterion_ss"])
 
-    # ---------------------------------------------------
-    # Optimizer
-    # ---------------------------------------------------
-    def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr)
-        return optimizer
+    # -------------------------------------------------
+    # 必須覆寫 forward()，否則 Lightning 用 base class forward
+    # -------------------------------------------------
+    def forward(self, x):
+        return self.base_model(x)  # (B, 6)
 
-    # ---------------------------------------------------
-    # Train step: 把 6 個 logits 拆成 2 個 head
-    # ---------------------------------------------------
+    def configure_optimizers(self):
+        return torch.optim.AdamW(self.parameters(), lr=self.lr)
+
     def training_step(self, batch, batch_idx):
-        images = batch["image"]          # 依你 datamodule 實際 key 為準
+        images = batch["image"]
         nfn_targets = batch["nfn_class"]
         ss_targets = batch["ss_class"]
 
-        logits = self.base_model(images)     # (B, 6)
-        nfn_logits = logits[:, :3]          # (B, 3)
-        ss_logits = logits[:, 3:]           # (B, 3)
+        logits = self(images)
+        nfn_logits = logits[:, :3]
+        ss_logits  = logits[:, 3:]
 
         loss_nfn = self.criterion_nfn(nfn_logits, nfn_targets)
-        loss_ss = self.criterion_ss(ss_logits, ss_targets)
+        loss_ss  = self.criterion_ss(ss_logits, ss_targets)
 
         loss = 0.5 * (loss_nfn + loss_ss)
 
-        self.log("train_loss", loss, prog_bar=True, on_step=True, on_epoch=True)
-        self.log("train_loss_nfn", loss_nfn, prog_bar=False, on_step=False, on_epoch=True)
-        self.log("train_loss_ss", loss_ss, prog_bar=False, on_step=False, on_epoch=True)
-
+        self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True)
         return loss
 
-    # ---------------------------------------------------
-    # Validation: 初始化 buffer + 收集 logits / targets
-    # ---------------------------------------------------
     def on_validation_epoch_start(self):
-        # 這四個就是 classification.py 期待的 multi-task buffer
         self.val_nfn_logits = []
         self.val_ss_logits = []
         self.val_nfn_targets = []
@@ -70,29 +60,15 @@ class AxialSSNFNWrapper(MyLightningModule):
         nfn_targets = batch["nfn_class"]
         ss_targets = batch["ss_class"]
 
-        logits = self.base_model(images)     # (B, 6)
+        logits = self(images)
         nfn_logits = logits[:, :3]
-        ss_logits = logits[:, 3:]
+        ss_logits  = logits[:, 3:]
 
-        loss_nfn = self.criterion_nfn(nfn_logits, nfn_targets)
-        loss_ss = self.criterion_ss(ss_logits, ss_targets)
-        loss = 0.5 * (loss_nfn + loss_ss)
-
-        # 收集給 validation_epoch_end 用
+        # collect
         self.val_nfn_logits.append(nfn_logits.detach().cpu())
         self.val_ss_logits.append(ss_logits.detach().cpu())
         self.val_nfn_targets.append(nfn_targets.detach().cpu())
         self.val_ss_targets.append(ss_targets.detach().cpu())
-
-        self.log("val_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
-        self.log("val_loss_nfn", loss_nfn, prog_bar=False, on_step=False, on_epoch=True)
-        self.log("val_loss_ss", loss_ss, prog_bar=False, on_step=False, on_epoch=True)
-
-        # 如果 base 的 validation_epoch_end 有用 outputs，
-        # 你也可以 return 一個 dict
-        return {
-            "val_loss": loss.detach(),
-        }
 
 
 # class AxialSSNFNWrapper(pl.LightningModule):
