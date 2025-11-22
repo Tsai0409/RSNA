@@ -919,6 +919,7 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         # Wrap backbone into multi-task LightningModule
         # --------------------------
         self.model = AxialSSNFNWrapper(
+            cfg=self,
             base_model=base,
             lr=self.lr,
             criterion_nfn=self.criterion_nfn,
