@@ -950,25 +950,44 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
     # ------------------------------------------------------
 
     def _build_dataframes(self):
-
-        # ==============================
-        # 基本設定
-        # ==============================
-        image_width_ratio = 2
+        image_width_ratio = 1
         center_pad_ratio = 0
 
-        # ==============================
-        # Left
-        # ==============================
-        df_left = pd.read_csv(self.train_df_path)
+        # ===========================
+        # 讀取原始資料
+        # ===========================
+        base_df = pd.read_csv(self.train_df_path)
+
+        # 與 single-task 保持一致（level + study_level）
+        base_df['level'] = base_df.pred_level.map({
+            1: 'l1_l2',
+            2: 'l2_l3',
+            3: 'l3_l4',
+            4: 'l4_l5',
+            5: 'l5_s1',
+        })
+        base_df['study_level'] = (
+            base_df.study_id.astype(str) + '_' +
+            base_df.level.str.replace('/', '_').str.lower()
+        )
+
+        # =====================================================
+        # ================== Left =============================
+        # =====================================================
+        df_left = base_df.copy()
+
+        # x_min = midline
         df_left['x_min'] = (df_left.x_max + df_left.x_min) / 2
         df_left.drop(columns=['x_max'], inplace=True)
         df_left['left_right'] = 'left'
 
+        # --------------- rename 左側 label ---------------
         left_cols = [
+            # N-FN
             'left_neural_foraminal_narrowing_normal',
             'left_neural_foraminal_narrowing_moderate',
             'left_neural_foraminal_narrowing_severe',
+            # SS
             'left_subarticular_stenosis_normal',
             'left_subarticular_stenosis_moderate',
             'left_subarticular_stenosis_severe',
@@ -977,24 +996,29 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         for c in left_cols:
             df_left[c.replace("left_", "")] = df_left[c].values
 
+        # x_max NEW
         df_left['x_max'] = df_left['x_min'] + df_left['image_width'] / image_width_ratio
 
         if center_pad_ratio != 0:
             df_left['x_min'] -= df_left['image_width'] / center_pad_ratio
 
+        # =====================================================
+        # ================== Right ============================
+        # =====================================================
+        df_right = base_df.copy()
 
-        # ==============================
-        # Right
-        # ==============================
-        df_right = pd.read_csv(self.train_df_path)
+        # x_max = midline
         df_right['x_max'] = (df_right.x_max + df_right.x_min) / 2
         df_right.drop(columns=['x_min'], inplace=True)
         df_right['left_right'] = 'right'
 
+        # --------------- rename 右側 label ---------------
         right_cols = [
+            # N-FN
             'right_neural_foraminal_narrowing_normal',
             'right_neural_foraminal_narrowing_moderate',
             'right_neural_foraminal_narrowing_severe',
+            # SS
             'right_subarticular_stenosis_normal',
             'right_subarticular_stenosis_moderate',
             'right_subarticular_stenosis_severe',
@@ -1003,44 +1027,56 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         for c in right_cols:
             df_right[c.replace("right_", "")] = df_right[c].values
 
+        # x_min NEW
         df_right['x_min'] = df_right['x_max'] - df_right['image_width'] / image_width_ratio
 
         if center_pad_ratio != 0:
             df_right['x_max'] += df_right['image_width'] / center_pad_ratio
 
-
-        # ==============================
-        # 合併（Left + Right）
-        # ==============================
+        # =====================================================
+        # 合併 L / R
+        # =====================================================
         df = pd.concat([df_left, df_right], ignore_index=True)
 
-
-        # ==============================
-        # 加入 multi-task class index
-        # ==============================
-        df["nfn_class"] = df[[
-            "neural_foraminal_narrowing_normal",
+        # =====================================================
+        # 兩個 multiclass index
+        # =====================================================
+        df["nfn_class"] = df[
+            ["neural_foraminal_narrowing_normal",
             "neural_foraminal_narrowing_moderate",
-            "neural_foraminal_narrowing_severe"
-        ]].values.argmax(axis=1)
+            "neural_foraminal_narrowing_severe"]
+        ].values.argmax(axis=1)
 
-        df["ss_class"] = df[[
-            "subarticular_stenosis_normal",
+        df["ss_class"] = df[
+            ["subarticular_stenosis_normal",
             "subarticular_stenosis_moderate",
-            "subarticular_stenosis_severe"
-        ]].values.argmax(axis=1)
+            "subarticular_stenosis_severe"]
+        ].values.argmax(axis=1)
 
-
-        # ==============================
-        # 設定 train_df / valid_df
-        # ==============================
-        self.train_df = df.copy()
+        # =====================================================
+        # valid = full SS NFN dataset
+        # train = noisy filtered
+        # =====================================================
         self.valid_df = df.copy()
 
-        print(">>> Multi-task axial SS/NFN dataframe ready!")
+        # noisy filtering
+        noise_df = pd.read_csv(
+            f'{WORKING_DIR}/csv_train/noise_reduction_by_oof_holdout_9/noisy_target_level_th09_holdout.csv'
+        )
+
+        # 這次是 multi-task → N-FN 和 SS 都要過濾
+        noise_df = noise_df[
+            (noise_df.target == 'neural_foraminal_narrowing') |
+            (noise_df.target == 'subarticular_stenosis')
+        ]
+
+        noisy_set = set(noise_df.study_level)
+
+        self.train_df = df[~df.study_level.isin(noisy_set)].reset_index(drop=True)
+
+        print(">>> Multi-task axial SS/NFN dataframe (SS NFN style) ready!")
         print(f"train_df: {len(self.train_df)} rows")
         print(f"valid_df: {len(self.valid_df)} rows")
-
 
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
