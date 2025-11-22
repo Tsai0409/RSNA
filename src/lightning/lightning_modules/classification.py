@@ -529,6 +529,30 @@ class MyLightningModule(pl.LightningModule):
     def forward(self, x):
         return self.model(x)
 
+    def _extract_logits(self, out):
+        """
+        統一把 model 的輸出抽成 logits Tensor。
+
+        - 如果是 Tensor：直接回傳
+        - 如果是 (logits, something)：回傳第一個
+        - 如果是 dict 且有 'logits'：回傳 dict['logits']
+        """
+        import torch
+
+        if isinstance(out, torch.Tensor):
+            return out
+
+        if isinstance(out, (list, tuple)):
+            # 常見形式: (logits, extra)
+            return out[0]
+
+        if isinstance(out, dict):
+            if "logits" in out:
+                return out["logits"]
+            # 其他 key 就自己依需求處理
+            # raise KeyError("No 'logits' key in model output dict")
+
+        raise TypeError(f"Unsupported model output type for _extract_logits: {type(out)}")
 
     # =============================
     # Training step
