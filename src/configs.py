@@ -1112,16 +1112,15 @@ class rsna_axial_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         df = pd.read_csv(self.train_df_path)
 
         # ---------------------------------------
-        # 建立 label（保持你原本的命名模式）
+        # Label：只保留 neural_foraminal_narrowing（NFN）
         # ---------------------------------------
         cols = []
         for prefix in ['left', 'right']:
-            for signal in ['neural_foraminal_narrowing', 'subarticular_stenosis']:
-                for cls in ['normal', 'moderate', 'severe']:
-                    cols.append(f'{prefix}_{signal}_{cls}')
+            for cls in ['normal', 'moderate', 'severe']:
+                cols.append(f'{prefix}_neural_foraminal_narrowing_{cls}')
 
         self.label_features = cols
-        self.num_classes = len(cols)
+        self.num_classes = len(cols)   # = 6
         self.task = "multiclass"
 
         # ---------------------------------------
@@ -1136,7 +1135,7 @@ class rsna_axial_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         self.criterion = MultiClassFocalLoss(gamma=2.0, alpha=alpha)
 
         # ---------------------------------------
-        # Hyper-parameters（保持你的風格）
+        # Hyper-parameters
         # ---------------------------------------
         self.image_size = 224
         self.batch_size = 8
@@ -1154,25 +1153,26 @@ class rsna_axial_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         self.crop_by_xy = False
 
         # ---------------------------------------
-        # valid：左右拼起來（跟你原本一樣）
+        # valid：左右拼起來（只包含 NFN）
         # ---------------------------------------
         valid_left = self._build_side_df(df.copy(), 'left', image_width_ratio, center_pad_ratio)
         valid_right = self._build_side_df(df.copy(), 'right', image_width_ratio, center_pad_ratio)
         self.valid_df = pd.concat([valid_left, valid_right], ignore_index=True)
 
         # ---------------------------------------
-        # train：去除 noisy（保持原始 style）
+        # train：去除 noisy（只過濾 NFN）
         # ---------------------------------------
         self.train_df = self._build_train_df(self.valid_df)
 
     # ============================================================
     def _build_side_df(self, df, side, image_width_ratio, center_pad_ratio):
         df['level'] = df.pred_level.map({
-            1: 'l1_l2', 2: 'l2_l3', 3: 'l3_l4', 4: 'l4_l5', 5: 'l5_s1',
+            1:'l1_l2', 2:'l2_l3', 3:'l3_l4', 4:'l4_l5', 5:'l5_s1'
         })
         df['study_level'] = df.study_id.astype(str) + '_' + df.level.str.replace('/', '_').str.lower()
         df['left_right'] = side
 
+        # 建立左右裁切框
         if side == 'left':
             df['x_min'] = (df.x_max + df.x_min) / 2
             del df['x_max']
@@ -1180,10 +1180,10 @@ class rsna_axial_nfn_ResNet50V2(rsna_v1_ResNet50V2):
             df['x_max'] = (df.x_max + df.x_min) / 2
             del df['x_min']
 
-        # label copy（完全模仿你原本的 pattern）
-        for signal in ['neural_foraminal_narrowing', 'subarticular_stenosis']:
-            for cls in ['normal', 'moderate', 'severe']:
-                df[f'{side}_{signal}_{cls}'] = df[f'{side}_{signal}_{cls}']
+        # ⭐ 只複製 neural_foraminal_narrowing（NFN） ⭐
+        for cls in ['normal', 'moderate', 'severe']:
+            df[f'{side}_neural_foraminal_narrowing_{cls}'] = \
+                df[f'{side}_neural_foraminal_narrowing_{cls}']
 
         # BBox 擴充
         if side == 'left':
@@ -1202,16 +1202,14 @@ class rsna_axial_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         noise_df = pd.read_csv(
             f'{WORKING_DIR}/csv_train/noise_reduction_by_oof_holdout_9/noisy_target_level_th09_holdout.csv'
         )
-        noise_df_left = noise_df[
-            (noise_df.target == 'left_neural_foraminal_narrowing') |
-            (noise_df.target == 'left_subarticular_stenosis')
-        ]
-        noise_df_right = noise_df[
-            (noise_df.target == 'right_neural_foraminal_narrowing') |
-            (noise_df.target == 'right_subarticular_stenosis')
-        ]
+
+        # ⭐ 只保留 NFN noisy 資料
+        noise_df_left = noise_df[noise_df.target == 'left_neural_foraminal_narrowing']
+        noise_df_right = noise_df[noise_df.target == 'right_neural_foraminal_narrowing']
+
         noisy_levels = set(noise_df_left.study_level) | set(noise_df_right.study_level)
         return valid_df[~valid_df.study_level.isin(noisy_levels)].reset_index(drop=True)
+
 
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
