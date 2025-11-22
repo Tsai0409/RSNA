@@ -694,27 +694,45 @@ class MyLightningModule(pl.LightningModule):
         # -------------------------------
         # 非 multi-task：走原本 6-class 流程
         # -------------------------------
-        if not getattr(self.cfg, "is_axial_ss_nfn", False):
-            acc = self.val_acc.compute()
-            prec = self.val_precision.compute()
-            rec = self.val_recall.compute()
-            f1 = self.val_f1.compute()
+        # ============================================================
+        # Multi-task axial SS/NFN
+        # ============================================================
+        if getattr(self.cfg, "is_axial_ss_nfn", False):
+            # 如果沒有資料（例如 sanity check 0 batch），避免 crash
+            if len(self.val_nfn_logits) == 0:
+                print("[Warn] No multi-task val logits collected.")
+                return
 
-            self.log("val_acc", acc, prog_bar=True)
-            self.log("val_precision", prec)
-            self.log("val_recall", rec)
-            self.log("val_f1", f1)
+            nfn_logits = torch.cat(self.val_nfn_logits, dim=0)    # (N, 3)
+            ss_logits  = torch.cat(self.val_ss_logits, dim=0)     # (N, 3)
+            nfn_targets = torch.cat(self.val_nfn_targets, dim=0)  # (N,)
+            ss_targets  = torch.cat(self.val_ss_targets, dim=0)   # (N,)
 
-            if self.val_confmat:
-                confmat = self.val_confmat.compute()
-                print(f"\n[Valid] Confusion Matrix:\n{confmat.cpu().numpy()}")
-                self.val_confmat.reset()
+            # preds
+            nfn_preds = nfn_logits.argmax(dim=1)
+            ss_preds  = ss_logits.argmax(dim=1)
 
-            self.val_acc.reset()
-            self.val_precision.reset()
-            self.val_recall.reset()
-            self.val_f1.reset()
-            return
+            # compute confusion matrices
+            nfn_cm = confusion_matrix(nfn_targets.cpu(), nfn_preds.cpu(), labels=[0,1,2])
+            ss_cm  = confusion_matrix(ss_targets.cpu(), ss_preds.cpu(), labels=[0,1,2])
+
+            print("========== Multi-task Confusion Matrices ==========\n")
+            print("[NFN Confusion Matrix 3x3]")
+            print(nfn_cm)
+            print("\n[SS Confusion Matrix 3x3]")
+            print(ss_cm)
+            print("\n========== Multi-task Confusion Matrices ==========\n")
+
+            # optional logging
+            self.log("val_nfn_acc", (nfn_preds == nfn_targets).float().mean())
+            self.log("val_ss_acc", (ss_preds == ss_targets).float().mean())
+            self.log("val_avg_acc", 0.5 * (
+                (nfn_preds == nfn_targets).float().mean() +
+                (ss_preds == ss_targets).float().mean()
+            ))
+
+            return    # ←←← 很重要！不要跑到 single-task 的後面
+
 
         # -------------------------------
         # ★ multi-task axial SS/NFN
