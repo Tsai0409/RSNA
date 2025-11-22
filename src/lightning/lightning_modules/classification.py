@@ -682,7 +682,7 @@ class MyLightningModule(pl.LightningModule):
     def validation_epoch_end(self, outputs):
 
         # -------------------------------
-        # 非 multi-task：跑原本 6-class metrics
+        # 非 multi-task：走原本 6-class 流程
         # -------------------------------
         if not getattr(self.cfg, "is_axial_ss_nfn", False):
             acc = self.val_acc.compute()
@@ -745,6 +745,7 @@ class MyLightningModule(pl.LightningModule):
         # clear buffers
         self.val_logits.clear()
         self.val_targets.clear()
+
 
 
 
