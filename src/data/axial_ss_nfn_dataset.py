@@ -1,4 +1,4 @@
-# datasets/axial_ss_nfn_dataset.py
+# data/axial_ss_nfn_dataset.py
 
 import torch
 from torch.utils.data import Dataset
