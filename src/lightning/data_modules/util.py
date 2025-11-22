@@ -5,7 +5,7 @@ import random
 import cv2
 import math
 
-from datasets.axial_ss_nfn_dataset import AxialSSNFNDataset
+from data.axial_ss_nfn_dataset import AxialSSNFNDataset
 
 def pickle_load(path):
     with open(path, mode='rb') as f:
