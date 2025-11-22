@@ -14,7 +14,7 @@ class AxialSSNFNDataset(Dataset):
     def __getitem__(self, idx):
         row = self.df.iloc[idx]
 
-        image = cv2.imread(row["image_path"], cv2.IMREAD_GRAYSCALE)
+        image = cv2.imread(row["path"], cv2.IMREAD_GRAYSCALE)
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
 
         if self.transforms:
