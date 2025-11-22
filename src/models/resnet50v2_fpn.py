@@ -1,5 +1,3 @@
-# resnet50v2_fpn.py
-
 import torch
 import torch.nn as nn
 import timm

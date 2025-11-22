@@ -155,10 +155,7 @@ if __name__ == "__main__":
         dirpath=OUTPUT_PATH, filename=f"fold_{args.fold}", auto_insert_metric_name=False,
         save_top_k=cfg.save_top_k, monitor=monitor, mode='max', verbose=True, save_last=False)
 
-    # early_stop_callback = EarlyStopping(  # EarlyStopping（提前停止機制）
-    #     patience=cfg.early_stop_patience, monitor=monitor, mode='max', verbose=True)
-    monitor = "val_avg_acc"
-    early_stop_callback = EarlyStopping(
+    early_stop_callback = EarlyStopping(  # EarlyStopping（提前停止機制）
         patience=cfg.early_stop_patience, monitor=monitor, mode='max', verbose=True)
     
     lr_monitor = LearningRateMonitor(  # LearningRateMonitor（學習率監控器）

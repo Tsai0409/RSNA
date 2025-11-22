@@ -10,7 +10,6 @@ import numpy as np
 import random
 from scipy.special import softmax
 from sklearn.metrics import roc_auc_score
-from sklearn.metrics import confusion_matrix
 from pdb import set_trace as st
 from .scheduler_optimizer import get_optimizer, get_scheduler
 
@@ -460,20 +459,10 @@ from torchmetrics import Accuracy, Precision, Recall, F1Score, ConfusionMatrix
 class MyLightningModule(pl.LightningModule):
     def __init__(self, cfg):
         super().__init__()
-        self.val_logits = []
-        self.val_targets = []
-
         self.model = cfg.model
         self.criterion = cfg.criterion
 
         self.cfg = cfg
-
-        # --- for axial SS/NFN multi-task ---
-        self.val_nfn_logits = []
-        self.val_ss_logits = []
-        self.val_nfn_targets = []
-        self.val_ss_targets = []
-
 
         # 判斷任務類型
         self.task = cfg.task
@@ -536,61 +525,20 @@ class MyLightningModule(pl.LightningModule):
     def forward(self, x):
         return self.model(x)
 
-    def _extract_logits(self, out):
-        """
-        統一把 model 的輸出抽成 logits Tensor。
-
-        - 如果是 Tensor：直接回傳
-        - 如果是 (logits, something)：回傳第一個
-        - 如果是 dict 且有 'logits'：回傳 dict['logits']
-        """
-        import torch
-
-        if isinstance(out, torch.Tensor):
-            return out
-
-        if isinstance(out, (list, tuple)):
-            # 常見形式: (logits, extra)
-            return out[0]
-
-        if isinstance(out, dict):
-            if "logits" in out:
-                return out["logits"]
-            # 其他 key 就自己依需求處理
-            # raise KeyError("No 'logits' key in model output dict")
-
-        raise TypeError(f"Unsupported model output type for _extract_logits: {type(out)}")
-
     # =============================
     # Training step
     # =============================
     def training_step(self, batch, batch_idx):
         images, targets = batch
+        logits = self.forward(images)
 
-        # 統一經過 forward，再抽 logits Tensor
-        out = self(images)                  # 等於 self.forward(images)
-        logits = self._extract_logits(out)  # out 可能是 Tensor 或 (Tensor, something)
-
-        # -------------------------------
-        # special case: axial_ss_nfn
-        # -> 使用兩個 head 的 loss，不跑 6-class metrics
-        # -------------------------------
-        if getattr(self.cfg, "is_axial_ss_nfn", False):
-            # logits: (B, 6), targets: (B, 2) 其中 [:,0] = NFN label, [:,1] = SS label
-            loss_nfn = self.cfg.criterion_nfn(logits[:, :3], targets[:, 0])
-            loss_ss  = self.cfg.criterion_ss (logits[:, 3:], targets[:, 1])
-            loss = loss_nfn + loss_ss
-
-            self.log("train_loss", loss, on_step=False, on_epoch=True)
-            return loss
-
-        # -------------------------------
-        # 原本的單頭 6-class 行為
-        # -------------------------------
+        # loss = self.cfg.criterion(logits, targets) 
         loss = self.criterion(logits, targets)
 
+        # 預測處理
         preds, y_true = self._get_preds_targets(logits, targets)
 
+        # 更新 metrics
         self.train_acc.update(preds, y_true)
         self.train_precision.update(preds, y_true)
         self.train_recall.update(preds, y_true)
@@ -598,6 +546,7 @@ class MyLightningModule(pl.LightningModule):
         if self.train_confmat:
             self.train_confmat.update(preds, y_true)
 
+        # log
         self.log("train_loss", loss, on_step=False, on_epoch=True)
         self.log("train_acc", self.train_acc, on_step=False, on_epoch=True, prog_bar=True)
         self.log("train_precision", self.train_precision, on_step=False, on_epoch=True)
@@ -606,44 +555,19 @@ class MyLightningModule(pl.LightningModule):
 
         return loss
 
-
     # =============================
     # Validation step
     # =============================
     def validation_step(self, batch, batch_idx):
         images, targets = batch
-
-        out = self(images)
-        logits = self._extract_logits(out)
-
-        # -------------------------------
-        # axial_ss_nfn：不跑 6-class metrics，只算 multi-task loss & 收 logits/targets
-        # -------------------------------
-        if self.cfg.is_axial_ss_nfn:
-            # ----- 原本就有的 loss 計算 -----
-            loss_nfn = self.cfg.criterion_nfn(logits[:, :3], targets[:, 0])
-            loss_ss  = self.cfg.criterion_ss(logits[:, 3:], targets[:, 1])
-            loss = 0.5 * (loss_nfn + loss_ss)
-
-            # 這邊應該已有 log / confusion matrix 用的 preds/targets，保留
-            # ...
-
-            # ----- 新增：存 logits / targets，給 validation_epoch_end 用 -----
-            self.val_nfn_logits.append(logits[:, :3].detach().cpu())
-            self.val_ss_logits.append(logits[:, 3:].detach().cpu())
-            self.val_nfn_targets.append(targets[:, 0].detach().cpu())
-            self.val_ss_targets.append(targets[:, 1].detach().cpu())
-
-            return loss
-
-
-        # -------------------------------
-        # 原本 6-class 行為
-        # -------------------------------
+        logits = self.forward(images)
+        # loss = self.cfg.criterion(logits, targets)
         loss = self.criterion(logits, targets)
+
 
         preds, y_true = self._get_preds_targets(logits, targets)
 
+        # 更新 metrics
         self.val_acc.update(preds, y_true)
         self.val_precision.update(preds, y_true)
         self.val_recall.update(preds, y_true)
@@ -651,20 +575,14 @@ class MyLightningModule(pl.LightningModule):
         if self.val_confmat:
             self.val_confmat.update(preds, y_true)
 
+
         self.log("val_loss", loss, on_epoch=True, prog_bar=True)
         return {"loss": loss.detach()}
 
-
     # =============================
-    # End of training epoch
+    # End of epoch
     # =============================
     def training_epoch_end(self, outputs):
-
-        # axial_ss_nfn：不需要 6-class metrics，因為我們根本沒在更新它
-        if getattr(self.cfg, "is_axial_ss_nfn", False):
-            return
-
-        # 6-class 原本行為
         acc = self.train_acc.compute()
         prec = self.train_precision.compute()
         rec = self.train_recall.compute()
@@ -685,139 +603,26 @@ class MyLightningModule(pl.LightningModule):
         self.train_recall.reset()
         self.train_f1.reset()
 
-
-    # =============================
-    # End of validation epoch
-    # =============================
     def validation_epoch_end(self, outputs):
+        acc = self.val_acc.compute()
+        prec = self.val_precision.compute()
+        rec = self.val_recall.compute()
+        f1 = self.val_f1.compute()
 
-        # -------------------------------
-        # 非 multi-task：走原本 6-class 流程
-        # -------------------------------
-        # ============================================================
-        # Multi-task axial SS/NFN
-        # ============================================================
-        if getattr(self.cfg, "is_axial_ss_nfn", False):
-            # 如果沒有資料（例如 sanity check 0 batch），避免 crash
-            if len(self.val_nfn_logits) == 0:
-                print("[Warn] No multi-task val logits collected.")
-                return
+        self.log("val_acc", acc, prog_bar=True)
+        self.log("val_precision", prec, prog_bar=True)
+        self.log("val_recall", rec, prog_bar=True)
+        self.log("val_f1", f1, prog_bar=True)
 
-            nfn_logits = torch.cat(self.val_nfn_logits, dim=0)    # (N, 3)
-            ss_logits  = torch.cat(self.val_ss_logits, dim=0)     # (N, 3)
-            nfn_targets = torch.cat(self.val_nfn_targets, dim=0)  # (N,)
-            ss_targets  = torch.cat(self.val_ss_targets, dim=0)   # (N,)
+        if self.val_confmat:
+            confmat = self.val_confmat.compute()
+            print(f"\n[Valid] Confusion Matrix:\n{confmat.cpu().numpy()}")
+            self.val_confmat.reset()
 
-            # preds
-            nfn_preds = nfn_logits.argmax(dim=1)
-            ss_preds  = ss_logits.argmax(dim=1)
-
-            # compute confusion matrices
-            nfn_cm = confusion_matrix(nfn_targets.cpu(), nfn_preds.cpu(), labels=[0,1,2])
-            ss_cm  = confusion_matrix(ss_targets.cpu(), ss_preds.cpu(), labels=[0,1,2])
-
-            print("========== Multi-task Confusion Matrices ==========\n")
-            print("[NFN Confusion Matrix 3x3]")
-            print(nfn_cm)
-            print("\n[SS Confusion Matrix 3x3]")
-            print(ss_cm)
-            print("\n========== Multi-task Confusion Matrices ==========\n")
-
-            # optional logging
-            self.log("val_nfn_acc", (nfn_preds == nfn_targets).float().mean())
-            self.log("val_ss_acc", (ss_preds == ss_targets).float().mean())
-            self.log("val_avg_acc", 0.5 * (
-                (nfn_preds == nfn_targets).float().mean() +
-                (ss_preds == ss_targets).float().mean()
-            ))
-
-            return    # ←←← 很重要！不要跑到 single-task 的後面
-
-
-        # -------------------------------
-        # ★ multi-task axial SS/NFN
-        # -------------------------------
-        print("\n========== Multi-task Confusion Matrices ==========\n")
-
-        logits = torch.cat(self.val_logits, dim=0)      # (N, 6)
-        targets = torch.cat(self.val_targets, dim=0)    # (N, 2)
-
-        # split logits
-        nfn_logits = logits[:, :3]
-        ss_logits  = logits[:, 3:]
-
-        # true labels
-        nfn_true = targets[:, 0].long()
-        ss_true  = targets[:, 1].long()
-
-        # predictions
-        nfn_pred = nfn_logits.argmax(dim=1)
-        ss_pred  = ss_logits.argmax(dim=1)
-
-        # build confusion matrices
-        cm_nfn = torch.zeros(3, 3, dtype=torch.int64)
-        cm_ss  = torch.zeros(3, 3, dtype=torch.int64)
-
-        for t, p in zip(nfn_true, nfn_pred):
-            cm_nfn[t, p] += 1
-
-        for t, p in zip(ss_true, ss_pred):
-            cm_ss[t, p] += 1
-
-        print("[NFN Confusion Matrix 3x3]")
-        print(cm_nfn.numpy())
-
-        print("\n[SS Confusion Matrix 3x3]")
-        print(cm_ss.numpy())
-
-        # clear buffers
-        self.val_logits.clear()
-        self.val_targets.clear()
-
-
-
-
-
-
-
-
-        # ====================================================
-        # Multi-task confusion matrix output
-        # ====================================================
-        if hasattr(self.cfg, "is_axial_ss_nfn") and self.cfg.is_axial_ss_nfn:
-
-            print("\n========== Multi-task Confusion Matrices ==========\n")
-
-            # concat all
-            nfn_logits = torch.cat(self.val_nfn_logits, dim=0)
-            ss_logits  = torch.cat(self.val_ss_logits, dim=0)
-            nfn_true   = torch.cat(self.val_nfn_trues, dim=0)
-            ss_true    = torch.cat(self.val_ss_trues, dim=0)
-
-            nfn_pred = nfn_logits.argmax(dim=1)
-            ss_pred  = ss_logits.argmax(dim=1)
-
-            cm_nfn = torch.zeros(3, 3, dtype=torch.int64)
-            cm_ss  = torch.zeros(3, 3, dtype=torch.int64)
-
-            for t, p in zip(nfn_true, nfn_pred):
-                cm_nfn[t, p] += 1
-
-            for t, p in zip(ss_true, ss_pred):
-                cm_ss[t, p] += 1
-
-            print("[NFN Confusion Matrix 3x3]")
-            print(cm_nfn.numpy())
-
-            print("\n[SS Confusion Matrix 3x3]")
-            print(cm_ss.numpy())
-
-            # clear caches
-            self.val_nfn_logits.clear()
-            self.val_ss_logits.clear()
-            self.val_nfn_trues.clear()
-            self.val_ss_trues.clear()
-
+        self.val_acc.reset()
+        self.val_precision.reset()
+        self.val_recall.reset()
+        self.val_f1.reset()
 
 
     # =============================

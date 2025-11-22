@@ -38,7 +38,7 @@ from src.models.model_with_arcface import ArcMarginProduct, AddMarginProduct, Ar
 from src.models.with_meta_models import WithMetaModel
 from src.models.resnet50v2_fpn import ResNet50V2FPN  # multiscale model
 from src.models.mil import SagittalMILModel  # multiscale model
-from src.models.axial_ss_nfn_wrapper import AxialSSNFNWrapper
+
 
 from src.utils.augmentations.strong_aug import *
 from src.utils.augmentations.augmentation import *
@@ -866,416 +866,128 @@ class rsna_v1_ResNet50V2(Baseline_ResNet50V2):
         self.p_rand_order_v1 = 0
 
 class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
-    """
-    Multi-task version of axial spinal model:
-      - Neural Foraminal Narrowing
-      - Subarticular Stenosis
-    Each: Normal, Moderate, Severe → 3 classes
-    Total outputs: 6 logits
-    """
+    def calculate_loss(self, logits, targets):
+        nfn_logits = logits[:, :3]
+        ss_logits  = logits[:, 3:]
+
+        nfn_target = targets[:, 0]
+        ss_target  = targets[:, 1]
+
+        loss_nfn = self.criterion_nfn(nfn_logits, nfn_target)
+        loss_ss  = self.criterion_ss(ss_logits, ss_target)
+
+        return loss_nfn + loss_ss
+
     def __init__(self, fold=0):
         super().__init__()
-        self.is_axial_ss_nfn = True   # <--- 加這行
-
-        # --------------------------
-        # Dataset label config
-        # --------------------------
-        self.fold = fold
-        self.label_features = [
-            'neural_foraminal_narrowing_normal',
-            'neural_foraminal_narrowing_moderate',
-            'neural_foraminal_narrowing_severe',
-            'subarticular_stenosis_normal',
-            'subarticular_stenosis_moderate',
-            'subarticular_stenosis_severe',
-        ]
-        self.num_classes = 6
-        self.task = "multiclass"
-
-        # --------------------------
-        # Hyperparameters
-        # --------------------------
-        self.lr = 1e-4
-        self.batch_size = 8
-        self.image_size = 224
-        self.epochs = 20
-        self.transform = medical_v4
-
-        # --------------------------
-        # Multi-task loss
-        # --------------------------
-        self.alpha_nfn = torch.tensor([0.04, 0.33, 0.63]).float()
-        self.alpha_ss = torch.tensor([0.05, 0.30, 0.65]).float()
-
-        self.criterion_nfn = MultiClassFocalLoss(gamma=2.0, alpha=self.alpha_nfn)
-        self.criterion_ss = MultiClassFocalLoss(gamma=2.0, alpha=self.alpha_ss)
-
-        # --------------------------
-        # Backbone Model
-        # --------------------------
-        base = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
-
-        # --------------------------
-        # Wrap backbone into multi-task LightningModule
-        # --------------------------
-        self.model = AxialSSNFNWrapper(
-            cfg=self,
-            base_model=base,
-            lr=self.lr,
-            criterion_nfn=self.criterion_nfn,
-            criterion_ss=self.criterion_ss,
-        )
-
-        # --------------------------
-        # Other configs
-        # --------------------------
-        self.box_crop = True
-        self.box_crop_x_ratio = 1
-        self.box_crop_y_ratio = 2
-        self.center_pad_ratio = 0
-        self.image_width_ratio = 1
-
-        self.grad_accumulations = 2
-        self.memo = ""
-        self.metric = None
-
-        # --------------------------
-        # Build dataframe
-        # --------------------------
-        self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_holdout_7/axial_classification_holdout.csv'
-        self._build_dataframes()
-
-    # ------------------------------------------------------
-    # REMOVE calculate_loss: wrapper handles training loss.
-    # If present, it may override wrapper logic accidentally.
-    # ------------------------------------------------------
-
-    def _build_dataframes(self):
-        image_width_ratio = 1
-        center_pad_ratio = 0
-
-        # ===========================
-        # 讀取原始資料
-        # ===========================
-        base_df = pd.read_csv(self.train_df_path)
-
-        # 與 single-task 保持一致（level + study_level）
-        base_df['level'] = base_df.pred_level.map({
-            1: 'l1_l2',
-            2: 'l2_l3',
-            3: 'l3_l4',
-            4: 'l4_l5',
-            5: 'l5_s1',
-        })
-        base_df['study_level'] = (
-            base_df.study_id.astype(str) + '_' +
-            base_df.level.str.replace('/', '_').str.lower()
-        )
-
-        # =====================================================
-        # ================== Left =============================
-        # =====================================================
-        df_left = base_df.copy()
-
-        # x_min = midline
-        df_left['x_min'] = (df_left.x_max + df_left.x_min) / 2
-        df_left.drop(columns=['x_max'], inplace=True)
-        df_left['left_right'] = 'left'
-
-        # --------------- rename 左側 label ---------------
-        left_cols = [
-            # N-FN
-            'left_neural_foraminal_narrowing_normal',
-            'left_neural_foraminal_narrowing_moderate',
-            'left_neural_foraminal_narrowing_severe',
-            # SS
-            'left_subarticular_stenosis_normal',
-            'left_subarticular_stenosis_moderate',
-            'left_subarticular_stenosis_severe',
-        ]
-
-        for c in left_cols:
-            df_left[c.replace("left_", "")] = df_left[c].values
-
-        # x_max NEW
-        df_left['x_max'] = df_left['x_min'] + df_left['image_width'] / image_width_ratio
-
-        if center_pad_ratio != 0:
-            df_left['x_min'] -= df_left['image_width'] / center_pad_ratio
-
-        # =====================================================
-        # ================== Right ============================
-        # =====================================================
-        df_right = base_df.copy()
-
-        # x_max = midline
-        df_right['x_max'] = (df_right.x_max + df_right.x_min) / 2
-        df_right.drop(columns=['x_min'], inplace=True)
-        df_right['left_right'] = 'right'
-
-        # --------------- rename 右側 label ---------------
-        right_cols = [
-            # N-FN
-            'right_neural_foraminal_narrowing_normal',
-            'right_neural_foraminal_narrowing_moderate',
-            'right_neural_foraminal_narrowing_severe',
-            # SS
-            'right_subarticular_stenosis_normal',
-            'right_subarticular_stenosis_moderate',
-            'right_subarticular_stenosis_severe',
-        ]
-
-        for c in right_cols:
-            df_right[c.replace("right_", "")] = df_right[c].values
-
-        # x_min NEW
-        df_right['x_min'] = df_right['x_max'] - df_right['image_width'] / image_width_ratio
-
-        if center_pad_ratio != 0:
-            df_right['x_max'] += df_right['image_width'] / center_pad_ratio
-
-        # =====================================================
-        # 合併 L / R
-        # =====================================================
-        df = pd.concat([df_left, df_right], ignore_index=True)
-
-        # =====================================================
-        # 兩個 multiclass index
-        # =====================================================
-        df["nfn_class"] = df[
-            ["neural_foraminal_narrowing_normal",
-            "neural_foraminal_narrowing_moderate",
-            "neural_foraminal_narrowing_severe"]
-        ].values.argmax(axis=1)
-
-        df["ss_class"] = df[
-            ["subarticular_stenosis_normal",
-            "subarticular_stenosis_moderate",
-            "subarticular_stenosis_severe"]
-        ].values.argmax(axis=1)
-
-        # =====================================================
-        # valid = full SS NFN dataset
-        # train = noisy filtered
-        # =====================================================
-        self.valid_df = df.copy()
-
-        # noisy filtering
-        noise_df = pd.read_csv(
-            f'{WORKING_DIR}/csv_train/noise_reduction_by_oof_holdout_9/noisy_target_level_th09_holdout.csv'
-        )
-
-        # 這次是 multi-task → N-FN 和 SS 都要過濾
-        noise_df = noise_df[
-            (noise_df.target == 'neural_foraminal_narrowing') |
-            (noise_df.target == 'subarticular_stenosis')
-        ]
-
-        noisy_set = set(noise_df.study_level)
-
-        self.train_df = df[~df.study_level.isin(noisy_set)].reset_index(drop=True)
-
-        print(">>> Multi-task axial SS/NFN dataframe (SS NFN style) ready!")
-        print(f"train_df: {len(self.train_df)} rows")
-        print(f"valid_df: {len(self.valid_df)} rows")
-
-class rsna_axial_ss_ResNet50V2(rsna_v1_ResNet50V2):
-    def __init__(self, fold=0):
-        super().__init__()
-        self.fold = fold
-        self.is_axial_ss_nfn = False   # <--- 加這行
-
-        # ---------------------------------------
-        # 路徑 + DF
-        # ---------------------------------------
-        self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_holdout_7/axial_classification_holdout.csv'
-        self.train_df = pd.read_csv(self.train_df_path)
-
-        # ---------------------------------------
-        # Label 設定（完全沿用你的 spinal 寫法）
-        # ---------------------------------------
         cols = []
-        for col in ["spinal_canal_stenosis"]:
+        label_features = [
+            'neural_foraminal_narrowing',
+            'subarticular_stenosis',
+        ]
+        for col in label_features:
             cols.append(f'{col}_normal')
             cols.append(f'{col}_moderate')
             cols.append(f'{col}_severe')
 
+        self.fold = fold  # 我加
         self.label_features = cols
-        self.num_classes = len(cols)
+        self.num_classes = len(self.label_features)
         self.task = "multiclass"
 
-        # ---------------------------------------
-        # Model
-        # ---------------------------------------
-        self.model = ResNet50V2FPN(
-            num_classes=self.num_classes,
-            pretrained=True
-        )
-
-        # ---------------------------------------
-        # Hyper-parameters（風格一致）
-        # ---------------------------------------
+        self.model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
+        
         self.image_size = 224
         self.batch_size = 8
-        self.grad_accumulations = 2
-        self.lr = 1e-4
-        self.epochs = 20
-        self.transform = medical_v3
-        
-        alpha = torch.tensor([0.032, 0.375, 0.593])
-        self.criterion = MultiClassFocalLoss(gamma=2.0, alpha=alpha)
+        self.lr = 1e-4  # 5.5e-5
+        self.epochs = 20  # 10
+        self.transform = medical_v4
 
-        self.drop_rate = 0.2
-        self.drop_path_rate = 0.0
+         # ========= Focal Loss α 設定（你計算的值） =========
+        self.alpha_nfn = torch.tensor([0.04, 0.33, 0.63]).float()
+        self.alpha_ss  = torch.tensor([0.05, 0.30, 0.65]).float()
 
-        # Flags：保留你的 style
-        self.metric = None
-        self.memo = ''
-        self.crop_by_xy = False
-        self.rsna_2024_multi_image = False
-        self.rsna_random_sample = False
-        self.rsna_2024_agg_val = False
+        # ====== Two Loss Functions ======
+        self.criterion_nfn = MultiClassFocalLoss(gamma=2.0, alpha=self.alpha_nfn)
+        self.criterion_ss  = MultiClassFocalLoss(gamma=2.0, alpha=self.alpha_ss)
 
         self.box_crop = True
         self.box_crop_x_ratio = 1
         self.box_crop_y_ratio = 2
+        self.center_pad_ratio = 0
+        self.image_width_ratio = 1  # 👈 保留這個，之後 _build_dataframes 用得到
 
-        # ---------------------------------------
-        # DataFrame 架構（完全依照你 spinal 的版本）
-        # ---------------------------------------
-        self._build_dataframes_center()
-
-    # -------------------------------------------------------------
-    # 與你原本的一樣：中心、不拆左右
-    # -------------------------------------------------------------
-    def _build_dataframes_center(self):
-        valid_df = pd.read_csv(self.train_df_path)
-        valid_df['level'] = valid_df.pred_level.map({
-            1: 'l1_l2',
-            2: 'l2_l3',
-            3: 'l3_l4',
-            4: 'l4_l5',
-            5: 'l5_s1',
-        })
-        valid_df['study_level'] = valid_df.study_id.astype(str) + '_' + valid_df.level.str.replace('/', '_').str.lower()
-        valid_df['left_right'] = 'center'
-
-        self.valid_df = valid_df.copy()
-
-        # 去除 noisy（保持風格一致）
-        noise_df = pd.read_csv(
-            f'{WORKING_DIR}/csv_train/noise_reduction_by_oof_holdout_9/noisy_target_level_th09_holdout.csv'
-        )
-        noise_df = noise_df[noise_df.target == 'spinal_canal_stenosis']
-        noisy_study_levels = set(noise_df.study_level)
-
-        self.train_df = valid_df[~valid_df.study_level.isin(noisy_study_levels)].reset_index(drop=True)
-
-
-class rsna_axial_nfn_ResNet50V2(rsna_v1_ResNet50V2):
-    def __init__(self, fold=0):
-        super().__init__()
-        self.fold = fold
-        self.is_axial_ss_nfn = False   # <--- 加這行
-
-        image_width_ratio = 2
-        center_pad_ratio = 0
-        self.box_crop_y_ratio = 2
-
-        # ---------------------------------------
-        # DF Load（同原風格）
-        # ---------------------------------------
-        self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_holdout_7/axial_classification_holdout.csv'
-        df = pd.read_csv(self.train_df_path)
-
-        # ---------------------------------------
-        # 建立 label（保持你原本的命名模式）
-        # ---------------------------------------
-        cols = []
-        for prefix in ['left', 'right']:
-            for signal in ['neural_foraminal_narrowing', 'subarticular_stenosis']:
-                for cls in ['normal', 'moderate', 'severe']:
-                    cols.append(f'{prefix}_{signal}_{cls}')
-
-        self.label_features = cols
-        self.num_classes = len(cols)
-        self.task = "multiclass"
-
-        # ---------------------------------------
-        # Model
-        # ---------------------------------------
-        self.model = ResNet50V2FPN(
-            num_classes=self.num_classes,
-            pretrained=True
-        )
-
-        alpha = torch.ones(self.num_classes) / self.num_classes
-        self.criterion = MultiClassFocalLoss(gamma=2.0, alpha=alpha)
-
-        # ---------------------------------------
-        # Hyper-parameters（保持你的風格）
-        # ---------------------------------------
-        self.image_size = 224
-        self.batch_size = 8
-        self.grad_accumulations = 2
-        self.lr = 1e-4
-        self.epochs = 20
-        self.transform = medical_v3
-
-        self.drop_rate = 0.2
+        self.drop_rate = 0.0
         self.drop_path_rate = 0.0
-
-        # Flags
         self.metric = None
         self.memo = ''
+        
+        self.grad_accumulations = 2
         self.crop_by_xy = False
+        self.rsna_2024_multi_image = False
+        self.rsna_random_sample = False
+        self.rsna_2024_agg_val = False
+        
+        self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_holdout_7/axial_classification_holdout.csv'
+        self._build_dataframes()
 
-        # ---------------------------------------
-        # valid：左右拼起來（跟你原本一樣）
-        # ---------------------------------------
-        valid_left = self._build_side_df(df.copy(), 'left', image_width_ratio, center_pad_ratio)
-        valid_right = self._build_side_df(df.copy(), 'right', image_width_ratio, center_pad_ratio)
+    def _build_dataframes(self):
+        # ----- 共用欄位處理 -----
+        def process_df(df, side):
+            df['level'] = df.pred_level.map({
+                1: 'l1_l2',
+                2: 'l2_l3',
+                3: 'l3_l4',
+                4: 'l4_l5',
+                5: 'l5_s1',
+            })
+            df['study_level'] = df.study_id.astype(str) + '_' + df.level.str.replace('/', '_').str.lower()
+            df['left_right'] = side
+
+            if side == 'left':
+                df['x_min'] = (df.x_max + df.x_min) / 2
+                del df['x_max']
+                for c in [
+                    'left_neural_foraminal_narrowing_normal',
+                    'left_neural_foraminal_narrowing_moderate',
+                    'left_neural_foraminal_narrowing_severe',
+                    'left_subarticular_stenosis_normal',
+                    'left_subarticular_stenosis_moderate',
+                    'left_subarticular_stenosis_severe',
+                ]:
+                    df[c.replace('left_', '')] = df[c].values
+                df['x_max'] = df['x_min'] + df['image_width'] / self.image_width_ratio
+                if self.center_pad_ratio != 0:
+                    df['x_min'] -= df['image_width'] / self.center_pad_ratio
+            else:
+                df['x_max'] = (df.x_max + df.x_min) / 2
+                del df['x_min']
+                for c in [
+                    'right_neural_foraminal_narrowing_normal',
+                    'right_neural_foraminal_narrowing_moderate',
+                    'right_neural_foraminal_narrowing_severe',
+                    'right_subarticular_stenosis_normal',
+                    'right_subarticular_stenosis_moderate',
+                    'right_subarticular_stenosis_severe',
+                ]:
+                    df[c.replace('right_', '')] = df[c].values
+                df['x_min'] = df['x_max'] - df['image_width'] / self.image_width_ratio
+                if self.center_pad_ratio != 0:
+                    df['x_max'] += df['image_width'] / self.center_pad_ratio
+            return df
+
+        # ----- 建立 valid_df（保留所有資料） -----
+        valid_left = pd.read_csv(self.train_df_path)
+        valid_left = process_df(valid_left, side='left')
+
+        valid_right = pd.read_csv(self.train_df_path)
+        valid_right = process_df(valid_right, side='right')
+
         self.valid_df = pd.concat([valid_left, valid_right], ignore_index=True)
 
-        # ---------------------------------------
-        # train：去除 noisy（保持原始 style）
-        # ---------------------------------------
-        self.train_df = self._build_train_df(self.valid_df)
+        # ----- 建立 train_df（去除 noisy 資料） -----
+        train_df = self.valid_df.copy()
 
-    # ============================================================
-    def _build_side_df(self, df, side, image_width_ratio, center_pad_ratio):
-        df['level'] = df.pred_level.map({
-            1: 'l1_l2', 2: 'l2_l3', 3: 'l3_l4', 4: 'l4_l5', 5: 'l5_s1',
-        })
-        df['study_level'] = df.study_id.astype(str) + '_' + df.level.str.replace('/', '_').str.lower()
-        df['left_right'] = side
-
-        if side == 'left':
-            df['x_min'] = (df.x_max + df.x_min) / 2
-            del df['x_max']
-        else:
-            df['x_max'] = (df.x_max + df.x_min) / 2
-            del df['x_min']
-
-        # label copy（完全模仿你原本的 pattern）
-        for signal in ['neural_foraminal_narrowing', 'subarticular_stenosis']:
-            for cls in ['normal', 'moderate', 'severe']:
-                df[f'{side}_{signal}_{cls}'] = df[f'{side}_{signal}_{cls}']
-
-        # BBox 擴充
-        if side == 'left':
-            df['x_max'] = df['x_min'] + df['image_width'] / image_width_ratio
-            if center_pad_ratio != 0:
-                df['x_min'] -= df['image_width'] / center_pad_ratio
-        else:
-            df['x_min'] = df['x_max'] - df['image_width'] / image_width_ratio
-            if center_pad_ratio != 0:
-                df['x_max'] += df['image_width'] / center_pad_ratio
-
-        return df
-
-    # ============================================================
-    def _build_train_df(self, valid_df):
         noise_df = pd.read_csv(
             f'{WORKING_DIR}/csv_train/noise_reduction_by_oof_holdout_9/noisy_target_level_th09_holdout.csv'
         )
@@ -1287,12 +999,12 @@ class rsna_axial_nfn_ResNet50V2(rsna_v1_ResNet50V2):
             (noise_df.target == 'right_neural_foraminal_narrowing') |
             (noise_df.target == 'right_subarticular_stenosis')
         ]
-        noisy_levels = set(noise_df_left.study_level) | set(noise_df_right.study_level)
-        return valid_df[~valid_df.study_level.isin(noisy_levels)].reset_index(drop=True)
+        noise_study_levels = set(noise_df_left.study_level) | set(noise_df_right.study_level)
+
+        self.train_df = train_df[~train_df.study_level.isin(noise_study_levels)].reset_index(drop=True)
 
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
 
 # classification for axial (stage 1)
 class rsna_axial_spinal_crop_base(rsna_v1):
@@ -1435,7 +1147,6 @@ class rsna_axial_spinal_ResNet50V2(rsna_v1_ResNet50V2):
     def __init__(self, fold=0):
         super().__init__()
         self.fold = fold  # 我加
-        self.is_axial_ss_nfn = False   # <--- 加這行
         # self.train_df_path = 'input/axial_classification.csv'
         # self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_7/axial_classification.csv'
         self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_holdout_7/axial_classification_holdout.csv'
@@ -1723,7 +1434,7 @@ class rsna_saggital_mil_spinal_ResNet50V2(rsna_v1_ResNet50V2):
         self.drop_rate = 0.2  # 0.0
         self.drop_path_rate = 0.0
         
-        self.use_sagittal_mil_dataset = False  # True
+        self.use_sagittal_mil_dataset = True
         self.box_crop = True
         self.box_crop_x_ratio = 1  # 1
         self.box_crop_y_ratio = 1  # 0.5
@@ -2085,7 +1796,7 @@ class rsna_saggital_mil_ss_ResNet50V2(rsna_v1_ResNet50V2):
         self.epochs = 20  # 10  # 6
         self.batch_size = 16
         self.grad_accumulations = 1
-        self.use_sagittal_mil_dataset = False  # True
+        self.use_sagittal_mil_dataset = True
 
         alpha = torch.tensor([0.081, 0.303, 0.616])   # Normal, Moderate, Severe -> axial_spinal -> fix
         self.criterion = MultiClassFocalLoss(gamma=2.0, alpha=alpha)
@@ -2476,7 +2187,8 @@ class rsna_saggital_mil_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         # base_model = timm.create_model(self.model_name, pretrained=True, num_classes=1, drop_rate=self.drop_rate, drop_path_rate=self.drop_path_rate)
         # self.model = RSNA2ndModel(base_model=base_model, num_classes=len(self.label_features), pool='avg', swin=False)
         # self.model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
-        self.model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
+        base_model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
+        self.model = SagittalMILModel(base_model, num_classes=self.num_classes, pooling="attention")
 
         self.metric = None
         self.memo = ''
@@ -2486,7 +2198,7 @@ class rsna_saggital_mil_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         self.image_size = 228  # 160
         self.batch_size = 16
         self.grad_accumulations = 1
-        self.use_sagittal_mil_dataset = False  # True
+        self.use_sagittal_mil_dataset = True
         self.ch_3_crop = True
         alpha = torch.tensor([0.040, 0.173, 0.787])   # Normal, Moderate, Severe -> axial_spinal -> fix
         self.criterion = MultiClassFocalLoss(gamma=2.0, alpha=alpha)
