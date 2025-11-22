@@ -5,6 +5,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
 from torchmetrics.classification import MulticlassConfusionMatrix
+from src.lightning.lightning_modules.classification import MyLightningModule
+
 
 
 class AxialSSNFNWrapper(MyLightningModule):
