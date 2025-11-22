@@ -950,76 +950,97 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
     # ------------------------------------------------------
 
     def _build_dataframes(self):
-        # ----- 共用欄位處理 -----
-        def process_df(df, side):
-            df['level'] = df.pred_level.map({
-                1: 'l1_l2',
-                2: 'l2_l3',
-                3: 'l3_l4',
-                4: 'l4_l5',
-                5: 'l5_s1',
-            })
-            df['study_level'] = df.study_id.astype(str) + '_' + df.level.str.replace('/', '_').str.lower()
-            df['left_right'] = side
 
-            if side == 'left':
-                df['x_min'] = (df.x_max + df.x_min) / 2
-                del df['x_max']
-                for c in [
-                    'left_neural_foraminal_narrowing_normal',
-                    'left_neural_foraminal_narrowing_moderate',
-                    'left_neural_foraminal_narrowing_severe',
-                    'left_subarticular_stenosis_normal',
-                    'left_subarticular_stenosis_moderate',
-                    'left_subarticular_stenosis_severe',
-                ]:
-                    df[c.replace('left_', '')] = df[c].values
-                df['x_max'] = df['x_min'] + df['image_width'] / self.image_width_ratio
-                if self.center_pad_ratio != 0:
-                    df['x_min'] -= df['image_width'] / self.center_pad_ratio
-            else:
-                df['x_max'] = (df.x_max + df.x_min) / 2
-                del df['x_min']
-                for c in [
-                    'right_neural_foraminal_narrowing_normal',
-                    'right_neural_foraminal_narrowing_moderate',
-                    'right_neural_foraminal_narrowing_severe',
-                    'right_subarticular_stenosis_normal',
-                    'right_subarticular_stenosis_moderate',
-                    'right_subarticular_stenosis_severe',
-                ]:
-                    df[c.replace('right_', '')] = df[c].values
-                df['x_min'] = df['x_max'] - df['image_width'] / self.image_width_ratio
-                if self.center_pad_ratio != 0:
-                    df['x_max'] += df['image_width'] / self.center_pad_ratio
-            return df
+        # ==============================
+        # 基本設定
+        # ==============================
+        # image_width_ratio = 2
+        # center_pad_ratio = 0
 
-        # ----- 建立 valid_df（保留所有資料） -----
-        valid_left = pd.read_csv(self.train_df_path)
-        valid_left = process_df(valid_left, side='left')
+        # ==============================
+        # Left
+        # ==============================
+        df_left = pd.read_csv(self.train_df_path)
+        df_left['x_min'] = (df_left.x_max + df_left.x_min) / 2
+        df_left.drop(columns=['x_max'], inplace=True)
+        df_left['left_right'] = 'left'
 
-        valid_right = pd.read_csv(self.train_df_path)
-        valid_right = process_df(valid_right, side='right')
-
-        self.valid_df = pd.concat([valid_left, valid_right], ignore_index=True)
-
-        # ----- 建立 train_df（去除 noisy 資料） -----
-        train_df = self.valid_df.copy()
-
-        noise_df = pd.read_csv(
-            f'{WORKING_DIR}/csv_train/noise_reduction_by_oof_holdout_9/noisy_target_level_th09_holdout.csv'
-        )
-        noise_df_left = noise_df[
-            (noise_df.target == 'left_neural_foraminal_narrowing') |
-            (noise_df.target == 'left_subarticular_stenosis')
+        left_cols = [
+            'left_neural_foraminal_narrowing_normal',
+            'left_neural_foraminal_narrowing_moderate',
+            'left_neural_foraminal_narrowing_severe',
+            'left_subarticular_stenosis_normal',
+            'left_subarticular_stenosis_moderate',
+            'left_subarticular_stenosis_severe',
         ]
-        noise_df_right = noise_df[
-            (noise_df.target == 'right_neural_foraminal_narrowing') |
-            (noise_df.target == 'right_subarticular_stenosis')
-        ]
-        noise_study_levels = set(noise_df_left.study_level) | set(noise_df_right.study_level)
 
-        self.train_df = train_df[~train_df.study_level.isin(noise_study_levels)].reset_index(drop=True)
+        for c in left_cols:
+            df_left[c.replace("left_", "")] = df_left[c].values
+
+        df_left['x_max'] = df_left['x_min'] + df_left['image_width'] / image_width_ratio
+
+        if center_pad_ratio != 0:
+            df_left['x_min'] -= df_left['image_width'] / center_pad_ratio
+
+
+        # ==============================
+        # Right
+        # ==============================
+        df_right = pd.read_csv(self.train_df_path)
+        df_right['x_max'] = (df_right.x_max + df_right.x_min) / 2
+        df_right.drop(columns=['x_min'], inplace=True)
+        df_right['left_right'] = 'right'
+
+        right_cols = [
+            'right_neural_foraminal_narrowing_normal',
+            'right_neural_foraminal_narrowing_moderate',
+            'right_neural_foraminal_narrowing_severe',
+            'right_subarticular_stenosis_normal',
+            'right_subarticular_stenosis_moderate',
+            'right_subarticular_stenosis_severe',
+        ]
+
+        for c in right_cols:
+            df_right[c.replace("right_", "")] = df_right[c].values
+
+        df_right['x_min'] = df_right['x_max'] - df_right['image_width'] / image_width_ratio
+
+        if center_pad_ratio != 0:
+            df_right['x_max'] += df_right['image_width'] / center_pad_ratio
+
+
+        # ==============================
+        # 合併（Left + Right）
+        # ==============================
+        df = pd.concat([df_left, df_right], ignore_index=True)
+
+
+        # ==============================
+        # 加入 multi-task class index
+        # ==============================
+        df["nfn_class"] = df[[
+            "neural_foraminal_narrowing_normal",
+            "neural_foraminal_narrowing_moderate",
+            "neural_foraminal_narrowing_severe"
+        ]].values.argmax(axis=1)
+
+        df["ss_class"] = df[[
+            "subarticular_stenosis_normal",
+            "subarticular_stenosis_moderate",
+            "subarticular_stenosis_severe"
+        ]].values.argmax(axis=1)
+
+
+        # ==============================
+        # 設定 train_df / valid_df
+        # ==============================
+        self.train_df = df.copy()
+        self.valid_df = df.copy()
+
+        print(">>> Multi-task axial SS/NFN dataframe ready!")
+        print(f"train_df: {len(self.train_df)} rows")
+        print(f"valid_df: {len(self.valid_df)} rows")
+
 
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
