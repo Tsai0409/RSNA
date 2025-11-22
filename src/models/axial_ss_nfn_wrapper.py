@@ -12,6 +12,7 @@ from src.lightning.lightning_modules.classification import MyLightningModule
 class AxialSSNFNWrapper(MyLightningModule):
     def __init__(self, base_model, lr, criterion_nfn, criterion_ss):
         super().__init__(cfg)
+        cfg=self,
         self.base_model = base_model
         self.lr = lr
         self.criterion_nfn = criterion_nfn
