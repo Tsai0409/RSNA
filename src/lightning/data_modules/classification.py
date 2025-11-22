@@ -329,6 +329,10 @@ def worker_init_fn(worker_id):  # worker_id 是由 DataLoader 在啟動每個子
     np.random.seed(np.random.get_state()[1][0] + worker_id)
     
 def get_dataset_class(cfg):
+    
+    if getattr(cfg, "is_axial_ss_nfn", False):
+        return AxialSSNFNDataset
+
     # cfg.use_sagittal_mil_dataset 在crop之前沒有出現
     # cfg.use_sagittal_mil_dataset = Ture -> sagittal classification 時使用
     if ((hasattr(cfg, 'use_sagittal_mil_dataset')) and (cfg.use_sagittal_mil_dataset)):  # sagittal classification 時才會用到
