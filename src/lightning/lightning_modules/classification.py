@@ -681,20 +681,19 @@ class MyLightningModule(pl.LightningModule):
     # =============================
     def validation_epoch_end(self, outputs):
 
-        # ------------------------------------------------
-        # 非 axial_ss_nfn → 走原本 6-class metrics 邏輯
-        # ------------------------------------------------
+        # -------------------------------
+        # 非 multi-task：跑原本 6-class metrics
+        # -------------------------------
         if not getattr(self.cfg, "is_axial_ss_nfn", False):
-
             acc = self.val_acc.compute()
             prec = self.val_precision.compute()
             rec = self.val_recall.compute()
             f1 = self.val_f1.compute()
 
             self.log("val_acc", acc, prog_bar=True)
-            self.log("val_precision", prec, prog_bar=True)
-            self.log("val_recall", rec, prog_bar=True)
-            self.log("val_f1", f1, prog_bar=True)
+            self.log("val_precision", prec)
+            self.log("val_recall", rec)
+            self.log("val_f1", f1)
 
             if self.val_confmat:
                 confmat = self.val_confmat.compute()
@@ -707,23 +706,27 @@ class MyLightningModule(pl.LightningModule):
             self.val_f1.reset()
             return
 
-        # ------------------------------------------------
-        # axial_ss_nfn → multi-task NFN / SS 混淆矩陣
-        # ------------------------------------------------
+        # -------------------------------
+        # ★ multi-task axial SS/NFN
+        # -------------------------------
         print("\n========== Multi-task Confusion Matrices ==========\n")
 
-        logits = torch.cat(self.val_logits, dim=0)   # (N, 6)
-        targets = torch.cat(self.val_targets, dim=0) # (N, 2)
+        logits = torch.cat(self.val_logits, dim=0)      # (N, 6)
+        targets = torch.cat(self.val_targets, dim=0)    # (N, 2)
 
+        # split logits
         nfn_logits = logits[:, :3]
         ss_logits  = logits[:, 3:]
 
+        # true labels
         nfn_true = targets[:, 0].long()
         ss_true  = targets[:, 1].long()
 
+        # predictions
         nfn_pred = nfn_logits.argmax(dim=1)
         ss_pred  = ss_logits.argmax(dim=1)
 
+        # build confusion matrices
         cm_nfn = torch.zeros(3, 3, dtype=torch.int64)
         cm_ss  = torch.zeros(3, 3, dtype=torch.int64)
 
@@ -739,8 +742,10 @@ class MyLightningModule(pl.LightningModule):
         print("\n[SS Confusion Matrix 3x3]")
         print(cm_ss.numpy())
 
+        # clear buffers
         self.val_logits.clear()
         self.val_targets.clear()
+
 
 
 
