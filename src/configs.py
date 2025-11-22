@@ -1083,6 +1083,7 @@ class rsna_axial_ss_ResNet50V2(rsna_v1_ResNet50V2):
     def __init__(self, fold=0):
         super().__init__()
         self.fold = fold
+        self.is_axial_ss_nfn = False   # <--- 加這行
 
         # ---------------------------------------
         # 路徑 + DF
@@ -1175,6 +1176,7 @@ class rsna_axial_nfn_ResNet50V2(rsna_v1_ResNet50V2):
     def __init__(self, fold=0):
         super().__init__()
         self.fold = fold
+        self.is_axial_ss_nfn = False   # <--- 加這行
 
         image_width_ratio = 2
         center_pad_ratio = 0
