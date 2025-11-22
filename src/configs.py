@@ -954,8 +954,8 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         # ==============================
         # 基本設定
         # ==============================
-        # image_width_ratio = 2
-        # center_pad_ratio = 0
+        image_width_ratio = 2
+        center_pad_ratio = 0
 
         # ==============================
         # Left
