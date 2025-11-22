@@ -1078,26 +1078,36 @@ class rsna_axial_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         df['study_level'] = df.study_id.astype(str) + '_' + df.level.str.replace('/', '_').str.lower()
         df['left_right'] = side
 
-        # ======= 左右修改 BBox =======
-        if side == 'left':
-            df['x_min'] = (df.x_max + df.x_min) / 2
-            del df['x_max']
-        else:
-            df['x_max'] = (df.x_max + df.x_min) / 2
-            del df['x_min']
+        # ================================
+        # 1. 正確 bbox（不會 NaN）
+        # ================================
+        mid = (df.x_min + df.x_max) / 2
 
-        # =======⭐ 建立唯一 label（不分左右）⭐=======
+        if side == 'left':
+            df['x_min'] = mid
+            df['x_max'] = df['x_min'] + df['image_width'] / 2   # ratio=2 固定
+        else:
+            df['x_max'] = mid
+            df['x_min'] = df['x_max'] - df['image_width'] / 2
+
+        # ================================
+        # 2. 保留 y_min / y_max（不動）
+        # ================================
+        # （原 df 就有 y_min、y_max）確保存在
+        assert 'y_min' in df.columns
+        assert 'y_max' in df.columns
+
+        # ================================
+        # 3. labels：合併左右成共同欄位（3 類）
+        # ================================
         DF_PREFIX = f"{side}_neural_foraminal_narrowing_"
 
-        df['neural_foraminal_narrowing_normal'] = df[DF_PREFIX + 'normal']
+        df['neural_foraminal_narrowing_normal']   = df[DF_PREFIX + 'normal']
         df['neural_foraminal_narrowing_moderate'] = df[DF_PREFIX + 'moderate']
-        df['neural_foraminal_narrowing_severe'] = df[DF_PREFIX + 'severe']
-
-        # ====== 保持 BBox 不變 ======
-        df['x_max'] = df.get('x_max', None)
-        df['x_min'] = df.get('x_min', None)
+        df['neural_foraminal_narrowing_severe']   = df[DF_PREFIX + 'severe']
 
         return df
+
 
     # ==========================================
     # 過濾 noisy（只過濾 NFN）
