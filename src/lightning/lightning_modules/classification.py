@@ -468,6 +468,13 @@ class MyLightningModule(pl.LightningModule):
 
         self.cfg = cfg
 
+        # --- for axial SS/NFN multi-task ---
+        self.val_nfn_logits = []
+        self.val_ss_logits = []
+        self.val_nfn_targets = []
+        self.val_ss_targets = []
+
+
         # 判斷任務類型
         self.task = cfg.task
         if self.task == "multilabel":
@@ -612,20 +619,23 @@ class MyLightningModule(pl.LightningModule):
         # -------------------------------
         # axial_ss_nfn：不跑 6-class metrics，只算 multi-task loss & 收 logits/targets
         # -------------------------------
-        if getattr(self.cfg, "is_axial_ss_nfn", False):
+        if self.cfg.is_axial_ss_nfn:
+            # ----- 原本就有的 loss 計算 -----
             loss_nfn = self.cfg.criterion_nfn(logits[:, :3], targets[:, 0])
-            loss_ss  = self.cfg.criterion_ss (logits[:, 3:], targets[:, 1])
-            loss = loss_nfn + loss_ss
+            loss_ss  = self.cfg.criterion_ss(logits[:, 3:], targets[:, 1])
+            loss = 0.5 * (loss_nfn + loss_ss)
 
-            if not hasattr(self, "val_logits"):
-                self.val_logits = []
-                self.val_targets = []
+            # 這邊應該已有 log / confusion matrix 用的 preds/targets，保留
+            # ...
 
-            self.val_logits.append(logits.detach().cpu())    # (B, 6)
-            self.val_targets.append(targets.detach().cpu())  # (B, 2)
+            # ----- 新增：存 logits / targets，給 validation_epoch_end 用 -----
+            self.val_nfn_logits.append(logits[:, :3].detach().cpu())
+            self.val_ss_logits.append(logits[:, 3:].detach().cpu())
+            self.val_nfn_targets.append(targets[:, 0].detach().cpu())
+            self.val_ss_targets.append(targets[:, 1].detach().cpu())
 
-            self.log("val_loss", loss, on_epoch=True, prog_bar=True)
-            return {"loss": loss.detach()}
+            return loss
+
 
         # -------------------------------
         # 原本 6-class 行為
