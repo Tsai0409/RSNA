@@ -1435,6 +1435,7 @@ class rsna_axial_spinal_ResNet50V2(rsna_v1_ResNet50V2):
     def __init__(self, fold=0):
         super().__init__()
         self.fold = fold  # 我加
+        self.is_axial_ss_nfn = False   # <--- 加這行
         # self.train_df_path = 'input/axial_classification.csv'
         # self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_7/axial_classification.csv'
         self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_holdout_7/axial_classification_holdout.csv'
