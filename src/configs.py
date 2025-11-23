@@ -1004,6 +1004,65 @@ class rsna_axial_ss_nfn_ResNet50V2(rsna_v1_ResNet50V2):
         self.train_df = train_df[~train_df.study_level.isin(noise_study_levels)].reset_index(drop=True)
 
 
+class rsna_axial_ss_ResNet50V2(rsna_v1_ResNet50V2):
+    def __init__(self, fold=0):
+        super().__init__()
+        self.fold = fold
+
+        # 資料來源
+        self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_holdout_7/axial_classification_holdout.csv'
+        df = pd.read_csv(self.train_df_path)
+
+        # label（單 signal）
+        label_features = [
+            'spinal_canal_stenosis_normal',
+            'spinal_canal_stenosis_moderate',
+            'spinal_canal_stenosis_severe',
+        ]
+        self.label_features = label_features
+        self.num_classes = len(self.label_features)
+        self.task = "multiclass"
+
+        # Model
+        self.model = ResNet50V2FPN(num_classes=self.num_classes, pretrained=True)
+
+        # Loss
+        alpha = torch.tensor([0.032, 0.375, 0.593])
+        self.criterion = MultiClassFocalLoss(gamma=2.0, alpha=alpha)
+
+        # 資料集建立
+        self.valid_df = self._build_valid_df(df)
+        self.train_df = self._build_train_df(self.valid_df)
+
+    # ------------------------------------------------------------
+    def _add_meta(self, df):
+        df['level'] = df.pred_level.map({
+            1: 'l1_l2',
+            2: 'l2_l3',
+            3: 'l3_l4',
+            4: 'l4_l5',
+            5: 'l5_s1',
+        })
+        df['study_level'] = df.study_id.astype(str) + '_' + df.level.str.replace('/', '_').str.lower()
+        df['left_right'] = 'center'
+        return df
+
+    # ------------------------------------------------------------
+    def _build_valid_df(self, df):
+        df = df.copy()
+        df = self._add_meta(df)
+        return df
+
+    # ------------------------------------------------------------
+    def _build_train_df(self, valid_df):
+        noise_df = pd.read_csv(
+            f'{WORKING_DIR}/csv_train/noise_reduction_by_oof_holdout_9/noisy_target_level_th09_holdout.csv'
+        )
+        noise_df = noise_df[noise_df.target == 'spinal_canal_stenosis']
+        noisy_levels = set(noise_df.study_level)
+        return valid_df[~valid_df.study_level.isin(noisy_levels)].reset_index(drop=True)
+
+
 class rsna_axial_nfn_ResNet50V2(rsna_v1_ResNet50V2):
     def __init__(self, fold=0):
         super().__init__()
