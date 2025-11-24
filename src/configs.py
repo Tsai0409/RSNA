@@ -1009,6 +1009,29 @@ class rsna_axial_ss_ResNet50V2(rsna_v1_ResNet50V2):
         super().__init__()
         self.fold = fold
 
+        self.image_size = 224  # 384
+        self.lr = 1e-4  # 1e-5
+        self.batch_size = 8
+        self.grad_accumulations = 2
+
+        self.box_crop = True
+        self.box_crop_x_ratio = 1
+        self.box_crop_y_ratio = 2
+        self.center_pad_ratio = 0
+        self.image_width_ratio = 1  # 👈 保留這個，之後 _build_dataframes 用得到
+
+        self.drop_rate = 0.2  # 0.0
+        self.drop_path_rate = 0.0
+        self.metric = None
+        self.memo = ''
+        
+        self.grad_accumulations = 2
+        self.crop_by_xy = False
+        self.rsna_2024_multi_image = False
+        self.rsna_random_sample = False
+        self.rsna_2024_agg_val = False
+        
+
         # 資料來源
         self.train_df_path = '/kaggle/working/duplicate/csv_train/axial_classification_holdout_7/axial_classification_holdout.csv'
         df = pd.read_csv(self.train_df_path)
@@ -1067,6 +1090,29 @@ class rsna_axial_nfn_ResNet50V2(rsna_v1_ResNet50V2):
     def __init__(self, fold=0):
         super().__init__()
         self.fold = fold
+
+        self.image_size = 224  # 384
+        self.lr = 1e-4  # 1e-5
+        self.batch_size = 8
+        self.grad_accumulations = 2
+
+        self.box_crop = True
+        self.box_crop_x_ratio = 1
+        self.box_crop_y_ratio = 2
+        self.center_pad_ratio = 0
+        self.image_width_ratio = 1  # 👈 保留這個，之後 _build_dataframes 用得到
+
+        self.drop_rate = 0.2  # 0.0
+        self.drop_path_rate = 0.0
+        self.metric = None
+        self.memo = ''
+        
+        self.grad_accumulations = 2
+        self.crop_by_xy = False
+        self.rsna_2024_multi_image = False
+        self.rsna_random_sample = False
+        self.rsna_2024_agg_val = False
+        
 
         # =============================
         # 路徑
